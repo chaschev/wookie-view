@@ -439,7 +439,12 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     })
   }
 
-  def $(jQuery: String):SimpleBrowser2
+  /**
+   * Todo: change into a wrapper object with methods: html(), text(), attr()
+   * @param jQuery
+   * @return
+   */
+  def $(jQuery: String):SimpleBrowser2 =
   {
     Platform.runLater(new Runnable {
       override def run(): Unit = {
