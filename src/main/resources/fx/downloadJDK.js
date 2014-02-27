@@ -50,7 +50,11 @@ var downloadIfFound = function(version, x64, platform){
     var $a = find(version, x64, platform);
 
     if($a){
+        try{
         clickIt($a);
+        }catch(e){
+            alert("error: " + e)
+        }
         return true;
     }
 

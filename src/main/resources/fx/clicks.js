@@ -24,7 +24,7 @@ var clickDom = function(el, etype){
 
 var printJQuery = function($sel){
     var r = $($sel);
-    alert("found " + r.length + " results: " + r.html());
+    alert("found " + r.length + " results for " + $sel + ": " + r.html());
 
     r.each(function(index, el){
         alert(el.outerHTML);

@@ -125,8 +125,6 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
 
   }
 
-
-
   private final val jsHandlers = new ConcurrentHashMap[Integer, JSHandler]
 
   {
@@ -265,51 +263,11 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
 
     val eventId: Int = random.nextInt
 
-    val urls = includeJsUrls.clone()
-
-    if (useJQuery && !useFirebug) {
-      urls += s"https://ajax.googleapis.com/ajax/libs/jquery/${SimpleBrowser2.JQUERY_VERSION}/jquery.min.js"
-    }
-
-    var latchCount = 0 // 1 is for clicks.js
-
-    latchCount += urls.length // for all the urls
-
-    //    if(includeJsScript.isDefined) latchCount += 1   // for user's JS
-
-    val latch = new CountDownLatch(latchCount)
-
-    val handler = new JSHandler(onLoad, eventId, latch)
-
     webEngine.getLoadWorker.stateProperty.addListener(new ChangeListener[Worker.State] {
       def changed(ov: ObservableValue[_ <: Worker.State], t: Worker.State, t1: Worker.State)
       {
         if (t1 eq Worker.State.SUCCEEDED) {
-          if (jsHandlers.putIfAbsent(eventId, handler) != null) {
-            return
-          }
-
-          if (onLoad != null) {
-            SimpleBrowser2.logger.info(s"registered event: $eventId for location $location, $t, $t1")
-
-            jsHandlers.put(eventId, handler)
-          }
-
-          if (useFirebug) {
-            webEngine.executeScript("if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}")
-          }
-
-          if (urls.nonEmpty) {
-            insertJS(eventId, new JSScript(urls.toArray, None))
-          }
-
-          if (includeJsScript.isDefined) {
-            insertJS(eventId, new JSScript(Array.empty, includeJsScript))
-          }
-
-          val clicksJs = io.Source.fromInputStream(getClass.getResourceAsStream("/fx/clicks.js")).mkString
-
-          insertJS(eventId, new JSScript(Array.empty, Some(clicksJs)))
+          includeStuffOnPage(eventId, location, onLoad)
         }
       }
     })
@@ -346,6 +304,66 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     webEngine.load(location)
 
     this
+  }
+
+  def includeStuffOnPage(eventId: Int, location: String,onLoad: Option[() => Unit]): Boolean =
+  {
+    if (!webEngine.executeScript(s"typeof __wookiePageInitialized == 'undefined'").asInstanceOf[Boolean]) {
+      SimpleBrowser2.logger.debug("wookie page already initialized")
+
+      if(onLoad.isDefined) onLoad.get.apply()
+
+      return true
+    }
+
+    val urls = includeJsUrls.clone()
+
+    if (useJQuery && !useFirebug) {
+      urls += s"https://ajax.googleapis.com/ajax/libs/jquery/${SimpleBrowser2.JQUERY_VERSION}/jquery.min.js"
+    }
+
+    var latchCount = 0 // 1 is for clicks.js
+
+    latchCount += urls.length // for all the urls
+
+    //    if(includeJsScript.isDefined) latchCount += 1   // for user's JS
+
+    val latch = new CountDownLatch(latchCount)
+
+    val handler = new JSHandler(onLoad, eventId, latch)
+
+    if (jsHandlers.putIfAbsent(eventId, handler) != null) {
+      return true
+    }
+
+    if (onLoad.isDefined) {
+      SimpleBrowser2.logger.info(s"registered event: $eventId for location $location")
+
+      jsHandlers.put(eventId, handler)
+    }
+
+    if (useFirebug) {
+      webEngine.executeScript("if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}")
+    }
+
+    if (urls.nonEmpty) {
+      insertJS(eventId, new JSScript(urls.toArray, None))
+    }
+
+    if (includeJsScript.isDefined) {
+      includeJsScript.get + "; var __wookiePageInitialized = true;"
+      insertJS(eventId, new JSScript(Array.empty, includeJsScript))
+    }
+
+    initClicksJs(eventId)
+    false
+  }
+
+  def initClicksJs(eventId: Int)
+  {
+    val clicksJs = io.Source.fromInputStream(getClass.getResourceAsStream("/fx/clicks.js")).mkString
+
+    insertJS(eventId, new JSScript(Array.empty, Some(clicksJs)))
   }
 
   case class JSScript(urls: Array[String], text: Option[String]) {
@@ -441,18 +459,25 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
 
   /**
    * Todo: change into a wrapper object with methods: html(), text(), attr()
-   * @param jQuery
+   * @param jQuerySelector
    * @return
    */
-  def $(jQuery: String):SimpleBrowser2 =
+  def $(jQuerySelector: String):SimpleBrowser2 =
   {
+    val url = history.last
+    val eventId = scala.util.Random.nextInt()
+
     Platform.runLater(new Runnable {
       override def run(): Unit = {
-        val s = s"printJQuery($jQuery)"
+        includeStuffOnPage(eventId, url, Some(() => {
+          val escapedSelector = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
 
-        println(s"executing $s")
+          val s = s"printJQuery('$escapedSelector')"
 
-        getEngine.executeScript(s)
+          println(s"executing $s")
+
+          getEngine.executeScript(s)
+        }))
       }
     })
 

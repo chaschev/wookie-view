@@ -19,6 +19,7 @@ import javafx.stage.Stage
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 import javafx.beans.value.{ObservableValue, ChangeListener}
+import scala.util.Random
 
 object DownloadFxApp3{
   final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
@@ -46,6 +47,11 @@ object DownloadFxApp3{
 
   def main(args: Array[String])
   {
+
+    DownloadFxApp3.version = "6u45"
+    DownloadFxApp3.oracleUser = Some("chaschev@gmail.com")
+    DownloadFxApp3.oraclePassword = Some("Shotgun8!")
+
     Application.launch(classOf[DownloadFxApp3], args: _*)
   }
 }
@@ -230,22 +236,23 @@ class DownloadFxApp3 extends Application{
   {
     browser.waitForLocation((newLoc, oldLoc) => { newLoc.contains("signon.jsp")}, -1,
       Some((event) => {
-        println(browser.$("#sso_username"))
-
         setStatus(progressLabel, "waiting for the login form...")
 
         Thread.sleep(1000)
 
         browser.waitFor("$('#sso_username').length > 0", 10000)
 
+        println(browser.$("#sso_username"))
+
         System.out.println("I see it all, I see it now!")
 
         Platform.runLater(new Runnable {
           def run()
           {
+            browser.initClicksJs(Random.nextInt())
             browser.getEngine.executeScript("" +
-              "alert($('#sso_username').val('" + DownloadFxApp3.oracleUser + "'));\n" +
-              "alert($('#ssopassword').val('" + DownloadFxApp3.oraclePassword + "'));\n" +
+              "alert($('#sso_username').val('" + DownloadFxApp3.oracleUser.get + "'));\n" +
+              "alert($('#ssopassword').val('" + DownloadFxApp3.oraclePassword.get + "'));\n" +
               "$clickIt($('.sf-btnarea a'))"
             )
           }
