@@ -439,7 +439,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     })
   }
 
-  def $(jQuery: String)
+  def $(jQuery: String):SimpleBrowser2
   {
     Platform.runLater(new Runnable {
       override def run(): Unit = {
@@ -450,5 +450,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
         getEngine.executeScript(s)
       }
     })
+
+    this
   }
 }

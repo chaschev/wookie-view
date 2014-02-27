@@ -137,6 +137,10 @@ class DownloadFxApp3 extends Application{
           {
             println(browser.$(".sf-btnarea a"))
 
+            browser
+              .$("'#sso_username'")
+              .$("'#ssopassword'")
+
             browser.getEngine.executeScript("" +
               "alert(document.getElementById('sso_username'));\n" +
               "alert($('#sso_username').val('" + DownloadFxApp3.oracleUser + "'));\n" +
