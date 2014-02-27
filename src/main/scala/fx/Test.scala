@@ -7,6 +7,8 @@ object Test {
   def main(args: Array[String]){
 //    val array = List("a", "b", "c")
 
+    val m = collection.immutable.HashMap(0 -> 1, 2 -> 3)
+
     val browser: SimpleBrowser2 = SimpleBrowser2.newBuilder
       .createWebView(true)
       .useFirebug(true)

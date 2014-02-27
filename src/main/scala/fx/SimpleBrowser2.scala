@@ -88,6 +88,22 @@ object SimpleBrowser2 {
   final val logger: Logger = LoggerFactory.getLogger(classOf[SimpleBrowser2])
 }
 
+abstract class NavigationEvent {
+  def ok() : Boolean
+}
+
+class NokNavigationEvent extends NavigationEvent{
+  override def ok() = false
+}
+
+case class OkNavigationEvent(newLocation:String, oldLocation:String) extends NavigationEvent{
+  override def ok() = true
+}
+
+case class NavigationRecord(dueAt:Long, predicate: ((String, String) => Boolean), future:SettableFuture[NavigationEvent]){
+  def isDue = dueAt != -1 && dueAt < System.currentTimeMillis()
+}
+
 class SimpleBrowser2(builder: Builder2) extends Pane {
   private val random: Random = new Random
 
@@ -101,7 +117,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
   protected val history = mutable.MutableList[String]()
   protected val navigationPredicates:util.Set[NavigationRecord] = Sets.newConcurrentHashSet()
 
-  protected val scheduler = Executors.newScheduledThreadPool(1)
+  protected val scheduler = Executors.newScheduledThreadPool(4)
 
   case class JSHandler(handler: Option[() => Unit], eventId: Int, latch: CountDownLatch) {
 //    private val scala = Sets.newConcurrentHashSet().asScala
@@ -109,9 +125,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
 
   }
 
-  case class NavigationRecord(dueAt:Long, predicate: ((String, String) => Boolean), future:SettableFuture[Boolean]){
-    def isDue = dueAt < System.currentTimeMillis()
-  }
+
 
   private final val jsHandlers = new ConcurrentHashMap[Integer, JSHandler]
 
@@ -129,10 +143,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     }, 50, TimeUnit.MILLISECONDS)
   }
 
-  def getWebView: WebView =
-  {
-    webView.get
-  }
+  def getWebView: Option[WebView] = webView
 
   def getEngine: WebEngine = webEngine
 
@@ -158,25 +169,26 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
   }
 
   /**
+   * Waits for a location to change.
    *
    * @param predicate(newLocation, oldLocation)
    */
-  def waitForLocation(predicate: ((String, String) => Boolean), timeoutMs: Int, handler: Option[()=>Unit]) : Boolean = {
-    val future:SettableFuture[Boolean] = SettableFuture.create()
+  def waitForLocation(predicate: ((String, String) => Boolean), timeoutMs: Int, handler: Option[(NavigationEvent)=>Unit]) : Boolean = {
+    val future:SettableFuture[NavigationEvent] = SettableFuture.create()
 
-    navigationPredicates.add(new NavigationRecord(System.currentTimeMillis() + timeoutMs, predicate, future))
+    navigationPredicates.add(new NavigationRecord(if(timeoutMs <=0 ) -1 else System.currentTimeMillis() + timeoutMs, predicate, future))
 
     if (handler.isDefined) {
       future.addListener(new Runnable {
         override def run(): Unit =
         {
-          handler.get.apply()
+          handler.get.apply(future.get())
         }
       }, scheduler)
 
       true
     }else{
-      future.get(timeoutMs, TimeUnit.MILLISECONDS)
+      future.get(timeoutMs, TimeUnit.MILLISECONDS).ok()
     }
   }
 
@@ -317,13 +329,13 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
           val isDue = r.isDue
 
           if(isDue) {
-            r.future.set(false)
+            r.future.set(new NokNavigationEvent)
             it.remove()
           }else{
             val matches = r.predicate.apply(newLoc, oldLoc)
 
             if(matches){
-              r.future.set(true)
+              r.future.set(new OkNavigationEvent(newLoc, oldLoc))
               it.remove()
             }
           }
