@@ -72,12 +72,12 @@ class DownloadFxApp3 extends Application{
   val progressLabel: Label = new Label("Retrieving a link...")
 
   val progressBar: ProgressBar = new ProgressBar(0)
-  var browser: SimpleBrowser2 = null
+  var browser: WookieView = null
 
   def createScene(stage: Stage)
   {
     try {
-      browser = SimpleBrowser2.newBuilder
+      browser = WookieView.newBuilder
         .useFirebug(false)
         .useJQuery(true)
         .createWebView(!DownloadFxApp3.miniMode)
@@ -295,7 +295,7 @@ class DownloadFxApp3 extends Application{
     })
   }
 
-  protected def tryArchivePage(found: Boolean, archiveUrl: Option[String], browser: SimpleBrowser2)
+  protected def tryArchivePage(found: Boolean, archiveUrl: Option[String], browser: WookieView)
   {
     if (!found && archiveUrl.isDefined) {
       tryFindVersionAtPage(browser, archiveUrl.get, (found) => {
@@ -318,7 +318,7 @@ class DownloadFxApp3 extends Application{
    * @param archiveUrl
    * @param whenDone(found Boolean)
    */
-  private[fx] def tryFindVersionAtPage(browser: SimpleBrowser2, archiveUrl: String, whenDone: (Boolean) => Unit)
+  private[fx] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit)
   {
     browser.load(archiveUrl, Some(() => {
         try {

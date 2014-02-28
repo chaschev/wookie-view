@@ -18,16 +18,17 @@ import javafx.stage.Stage;
 
 public class FXBrowser {
     public static class FxBrowserApp extends Application {
-
         @Override
         public void start(Stage stage) throws Exception {
             try {
-                final SimpleBrowser2 browser = SimpleBrowser2.newBuilder()
+                final WookieView browser = WookieView.newBuilder()
                     .useFirebug(false)
                     .useJQuery(true)
                     .build();
 
-                final TextField location = new TextField(FXBrowser.class.getResource("/app/bear.html").toExternalForm());
+                String initialUrl = "http://www.google.com"; //FXBrowser.class.getResource("http://www.google.com").toExternalForm();
+
+                final TextField location = new TextField(initialUrl);
 
                 Button go = new Button("Go");
 
@@ -83,7 +84,30 @@ public class FXBrowser {
 
                 VBox.setVgrow(browser, Priority.ALWAYS);
 
-                browser.load(FXBrowser.class.getResource("/app/bear.html").toExternalForm());
+                browser.load(initialUrl, new Runnable() {
+                    @Override
+                    public void run() {
+                        System.out.println("-----");
+                        System.out.println(browser.$("input").html());
+                        System.out.println("-----");
+                        System.out.println(browser.$("div").html());
+                        System.out.println("-----");
+                        System.out.println(browser.$("div").text());
+                        System.out.println("-----");
+//                        System.out.println(browser.$("html").html());
+                        System.out.println("-----");
+                        System.out.println(browser.$("a").attr("href"));
+                        System.out.println("-----");
+                        System.out.println("text:" + browser.$("input[maxlength]").html());
+                        browser.
+                            $("input[maxlength]")
+                            .value("bear java deployment")
+                            .submit();
+//                        System.out.println("button:" + browser.$("input[type=submit]:first").html());
+//                        browser.$("input[type=submit]:first").click(); doesn't work
+//                        browser.$("input[maxlength]").pressEnter(); doesn't work
+                    }
+                });
             } catch (Exception e) {
                 e.printStackTrace();
             }

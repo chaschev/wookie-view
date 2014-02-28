@@ -9,7 +9,7 @@ object Test {
 
     val m = collection.immutable.HashMap(0 -> 1, 2 -> 3)
 
-    val browser: SimpleBrowser2 = SimpleBrowser2.newBuilder
+    val browser: WookieView = WookieView.newBuilder
       .createWebView(true)
       .useFirebug(true)
       .useJQuery(true)

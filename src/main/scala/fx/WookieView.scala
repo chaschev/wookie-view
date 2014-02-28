@@ -13,79 +13,178 @@ import javafx.scene.web.WebView
 import netscape.javascript.JSObject
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import javax.annotation.Nullable
-import java.util.{Collections, Random}
+import java.util.{Random}
 import java.util.concurrent._
-import com.google.common.base.Preconditions
 import scala.collection.mutable
 import org.apache.commons.lang3.{StringUtils, StringEscapeUtils}
-import org.apache.http.{HttpEntity, HttpResponse}
-import org.apache.commons.io.{FilenameUtils, IOUtils}
-import java.io.{FileOutputStream, File}
-import com.google.common.io.{ByteStreams, CountingOutputStream}
-import chaschev.io.FileUtils
-import chaschev.lang.LangUtils
 import com.google.common.collect.{Sets, Maps}
-import collection.JavaConverters._
 import java.util
 import scala.Some
 import com.google.common.util.concurrent.SettableFuture
 
-class Builder2 {
+class WookieBuilder {
   var createWebView: Boolean = true
   var useFirebug: Boolean = true
   var useJQuery: Boolean = false
   var includeJsScript: Option[String] = None
   var includeJsUrls: mutable.MutableList[String] = new mutable.MutableList[String]
 
-  def build: SimpleBrowser2 =
+  def build: WookieView =
   {
-    new SimpleBrowser2(this)
+    new WookieView(this)
   }
 
-  def createWebView(b: Boolean): Builder2 =
+  def createWebView(b: Boolean): WookieBuilder =
   {
     createWebView = b; this
   }
 
-  def useJQuery(b: Boolean): Builder2 =
+  def useJQuery(b: Boolean): WookieBuilder =
   {
     useJQuery = b; this
   }
 
-  def useFirebug(b: Boolean): Builder2 =
+  def useFirebug(b: Boolean): WookieBuilder =
   {
     useFirebug = b; this
   }
 
-  def includeJsScript(s: String): Builder2 =
+  def includeJsScript(s: String): WookieBuilder =
   {
     includeJsScript = Some(s); this
   }
 
-  def addScriptUrls(s: String): Builder2 =
+  def addScriptUrls(s: String): WookieBuilder =
   {
     includeJsUrls += s; this
   }
 
 }
 
-/**
- * Add a script to a header.
- * Click a button.
- * Wait for an element to appear.
- * Check if jQuery is added.
- * Wait for navigation event.
- */
-object SimpleBrowser2 {
-  final val JQUERY_VERSION = "1.9.1"
+class DirectJQueryWrapper(jQueryObject:JSObject, wookie:WookieView) extends JQueryWrapper(null, wookie){
+  val jQueryObj:JSObject = jQueryObject
 
-  def newBuilder: Builder2 =
-  {
-    new Builder2()
+  override def text(): String = jQueryObj.call("text", Array.empty).asInstanceOf
+}
+
+class JQueryWrapper(selector:String, wookie:WookieView){
+  val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
+
+  def attrs():List[String] = {
+    interact(s"jQueryAttrs('$escapedSelector')").asInstanceOf
   }
 
-  final val logger: Logger = LoggerFactory.getLogger(classOf[SimpleBrowser2])
+  def attr(name:String):String = {
+    interact(s"jQuery('$escapedSelector').attr('$name')").asInstanceOf[String]
+  }
+
+  def attr(name:String, value:String):JQueryWrapper = {
+    interact(s"jQuery('$escapedSelector').attr('$name', '$value')")
+    this
+  }
+
+  def value(value:String):JQueryWrapper = {
+    interact(s"jQuery('$escapedSelector').val('$value')")
+    this
+  }
+
+  def click():JQueryWrapper = {
+    interact(s"$$clickIt('$escapedSelector')")
+    this
+  }
+
+  def submit():JQueryWrapper = {
+    interact(s"submitEnclosingForm('$escapedSelector')")
+    this
+  }
+
+  def pressKey(code:Int):JQueryWrapper = {
+    interact(s"pressKey('$escapedSelector', $code)")
+    this
+  }
+
+  def pressEnter():JQueryWrapper = {
+    pressKey(13)
+    this
+  }
+
+  def html():String = {
+    interact(s"jQuery_text('$escapedSelector', true)".toString).asInstanceOf[String]
+//    return "keke"
+//    "keke"
+  }
+
+  def text():String = {
+    interact(s"jQuery_text('$escapedSelector', false)").asInstanceOf[String]
+  }
+
+  def interact(script:String, timeoutMs:Long = 5000):AnyRef = {
+    WookieView.logger.debug(s"interact: $script")
+
+    val url = wookie.getHistory.last
+    val eventId = scala.util.Random.nextInt()
+
+    val latch = new CountDownLatch(1)
+
+    var r:AnyRef = null
+
+    wookie.includeStuffOnPage(eventId, url, Some(() => {
+      WookieView.logger.debug(s"executing $script")
+      r = wookie.getEngine.executeScript(script)
+      latch.countDown()
+    }))
+
+    r = wookie.getEngine.executeScript(script)
+    latch.countDown()
+
+    val started = System.currentTimeMillis()
+    var expired = false
+
+    while(!expired && !latch.await(1000, TimeUnit.MILLISECONDS) ){
+      if(System.currentTimeMillis() - started > timeoutMs) expired = true
+    }
+
+    if(expired == true){
+      throw new TimeoutException(s"JS was not executed in ${timeoutMs}ms")
+    }
+
+    WookieView.logger.trace(s"left interact: $script")
+
+    r
+  }
+
+  def html(s:String):JQueryWrapper = {
+
+    this
+  }
+
+  def append(s:String):JQueryWrapper = {
+    this
+  }
+
+  def asResultList():List[JQueryWrapper] = {
+    throw new UnsupportedOperationException
+  }
+
+  override def toString: String = html()
+}
+
+/**
+ * (ok) Add a script to a header.
+ * (ok) Click a button.
+ * (ok) Wait for an element to appear.
+ * (ok) Check if jQuery is added.
+ * (ok) Wait for navigation event.
+ */
+object WookieView {
+  final val JQUERY_VERSION = "1.9.1"
+
+  def newBuilder: WookieBuilder =
+  {
+    new WookieBuilder()
+  }
+
+  final val logger: Logger = LoggerFactory.getLogger(classOf[WookieView])
 }
 
 abstract class NavigationEvent {
@@ -104,7 +203,7 @@ case class NavigationRecord(dueAt:Long, predicate: ((String, String) => Boolean)
   def isDue = dueAt != -1 && dueAt < System.currentTimeMillis()
 }
 
-class SimpleBrowser2(builder: Builder2) extends Pane {
+class WookieView(builder: WookieBuilder) extends Pane {
   private val random: Random = new Random
 
   protected val webView: Option[WebView] = if (builder.createWebView) Some(new WebView) else None
@@ -124,6 +223,8 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
 //    private val map: ConcurrentHashMap[NavigationRecord, Boolean] =
 
   }
+
+  def getHistory = {history}
 
   private final val jsHandlers = new ConcurrentHashMap[Integer, JSHandler]
 
@@ -145,11 +246,11 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
 
   def getEngine: WebEngine = webEngine
 
-  def load(location: String): SimpleBrowser2 = load(location, None)
+  def load(location: String): WookieView = load(location, None)
 
   def jsReady(eventId: Int, from: String)
   {
-    SimpleBrowser2.logger.info(s"event $eventId arrived from $from")
+    WookieView.logger.info(s"event $eventId arrived from $from")
 
     val jsHandler = jsHandlers.get(eventId)
 
@@ -164,6 +265,8 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
         }
       }
     }
+
+    WookieView.logger.debug(s"leaving from jsReady, eventId: $eventId")
   }
 
   /**
@@ -201,7 +304,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     Platform.runLater(new Runnable {
       def run()
       {
-        insertJQuery(eventId, SimpleBrowser2.JQUERY_VERSION)
+        insertJQuery(eventId, WookieView.JQUERY_VERSION)
       }
     })
 
@@ -243,16 +346,16 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     }
   }
 
-  def load(location: String, r: Runnable): SimpleBrowser2 =
+  def load(location: String, r: Runnable): WookieView =
   {
     load(location, Some(() => {
       r.run()
     }))
   }
 
-  def load(location: String, onLoad: Option[() => Unit]): SimpleBrowser2 =
+  def load(location: String, onLoad: Option[() => Unit]): WookieView =
   {
-    SimpleBrowser2.logger.info("navigating to {}", location)
+    WookieView.logger.info("navigating to {}", location)
 
     webEngine.setOnAlert(new EventHandler[WebEvent[String]] {
       def handle(webEvent: WebEvent[String])
@@ -267,6 +370,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
       def changed(ov: ObservableValue[_ <: Worker.State], t: Worker.State, t1: Worker.State)
       {
         if (t1 eq Worker.State.SUCCEEDED) {
+          WookieView.logger.info(s"page ready: $location")
           includeStuffOnPage(eventId, location, onLoad)
         }
       }
@@ -275,7 +379,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     webEngine.locationProperty().addListener(new ChangeListener[String] {
       def changed(observableValue: ObservableValue[_ <: String], oldLoc: String, newLoc: String)
       {
-        SimpleBrowser2.logger.info(s"location changed to $newLoc")
+        WookieView.logger.info(s"location changed to $newLoc")
 
         history += newLoc
 
@@ -306,20 +410,28 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     this
   }
 
-  def includeStuffOnPage(eventId: Int, location: String,onLoad: Option[() => Unit]): Boolean =
+  def includeStuffOnPage(eventId: Int, location: String, onLoad: Option[() => Unit]): Boolean =
   {
-    if (!webEngine.executeScript(s"typeof __wookiePageInitialized == 'undefined'").asInstanceOf[Boolean]) {
-      SimpleBrowser2.logger.debug("wookie page already initialized")
+    try {
+      val s = webEngine.executeScript(s"'' + window.__wookiePageInitialized").asInstanceOf[String]
+      if (s == "true") {
 
-      if(onLoad.isDefined) onLoad.get.apply()
+        WookieView.logger.debug(s"wookie page $location already initialized")
 
-      return true
+        if (onLoad.isDefined) onLoad.get.apply()
+
+        return true
+      }
+    } catch {
+      case e:Exception => WookieView.logger.debug("exception", e)
     }
+
+    WookieView.logger.info(s"initializing $location")
 
     val urls = includeJsUrls.clone()
 
     if (useJQuery && !useFirebug) {
-      urls += s"https://ajax.googleapis.com/ajax/libs/jquery/${SimpleBrowser2.JQUERY_VERSION}/jquery.min.js"
+      urls += s"https://ajax.googleapis.com/ajax/libs/jquery/${WookieView.JQUERY_VERSION}/jquery.min.js"
     }
 
     var latchCount = 0 // 1 is for clicks.js
@@ -337,7 +449,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     }
 
     if (onLoad.isDefined) {
-      SimpleBrowser2.logger.info(s"registered event: $eventId for location $location")
+      WookieView.logger.info(s"registered event: $eventId for location $location")
 
       jsHandlers.put(eventId, handler)
     }
@@ -351,11 +463,13 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
     }
 
     if (includeJsScript.isDefined) {
-      includeJsScript.get + "; var __wookiePageInitialized = true;"
       insertJS(eventId, new JSScript(Array.empty, includeJsScript))
     }
 
     initClicksJs(eventId)
+
+    getEngine.executeScript("window.__wookiePageInitialized = true;")
+
     false
   }
 
@@ -387,7 +501,7 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
   {
     val jsWindow: JSObject = webEngine.executeScript("window").asInstanceOf[JSObject]
 
-    jsWindow.setMember("simpleBrowser", SimpleBrowser2.this)
+    jsWindow.setMember("simpleBrowser", WookieView.this)
 
     val isUrlsMode = jsScript.text.isEmpty
 
@@ -462,25 +576,8 @@ class SimpleBrowser2(builder: Builder2) extends Pane {
    * @param jQuerySelector
    * @return
    */
-  def $(jQuerySelector: String):SimpleBrowser2 =
+  def $(jQuerySelector: String):JQueryWrapper =
   {
-    val url = history.last
-    val eventId = scala.util.Random.nextInt()
-
-    Platform.runLater(new Runnable {
-      override def run(): Unit = {
-        includeStuffOnPage(eventId, url, Some(() => {
-          val escapedSelector = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
-
-          val s = s"printJQuery('$escapedSelector')"
-
-          println(s"executing $s")
-
-          getEngine.executeScript(s)
-        }))
-      }
-    })
-
-    this
+    new JQueryWrapper(jQuerySelector, this)
   }
 }
