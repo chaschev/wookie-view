@@ -20,6 +20,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 import javafx.beans.value.{ObservableValue, ChangeListener}
 import scala.util.Random
+import scala.concurrent.ops._
+import scala.concurrent.ExecutionContext
 
 object DownloadFxApp3{
   final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
@@ -139,125 +141,123 @@ class DownloadFxApp3 extends Application{
     VBox.setVgrow(browser, Priority.ALWAYS)
   }
 
-  def whenDownloadStarts
+  def whenDownloadStarts()
   {
-    browser.waitForLocation((uri, oldLoc) => {
-      uri.contains("download.oracle") && uri.contains("?")
-    }, -1, Some((event) => {
+    browser.waitForLocation(new WaitForArg()
+      .timeoutNone()
+      .withPredicate((uri, oldLoc, arg) => { uri.contains("download.oracle") && uri.contains("?")})
+      .isPageReadyEvent(false)
+      .handler((event) => {
       // will be here after
       // clicking accept license and link -> * not logged in * -> here -> download -> redirect to login
       // download -> fill form -> * logged in * -> here -> download
+      val navEvent:OkNavigationEvent = event.asInstanceOf[OkNavigationEvent]
 
-      val navEvent = event.asInstanceOf[OkNavigationEvent]
       val uri = navEvent.newLocation
 
-      val thread: Thread = new Thread(new Runnable {
-        def run
-        {
-          try {
-            //there must be a shorter way to do this
 
-            val httpClient: DefaultHttpClient = new DefaultHttpClient
-            val httppost: HttpGet = new HttpGet(uri)
-            val response: HttpResponse = httpClient.execute(httppost)
+      spawn {
+        Thread.currentThread().setName("fx-downloader")
 
-            val code = response.getStatusLine.getStatusCode
+        try {
+          //there must be a shorter way to do this
 
-            if (code != 200) {
-              System.out.println(IOUtils.toString(response.getEntity.getContent))
-              throw new RuntimeException("failed to download: " + uri)
-            }
+          val httpClient = new DefaultHttpClient
+          val httpget = new HttpGet(uri)
+          val response = httpClient.execute(httpget)
 
-            val file = new File(DownloadFxApp3.tempDestDir, StringUtils.substringBefore(FilenameUtils.getName(uri), "?"))
+          val code = response.getStatusLine.getStatusCode
 
-            val httpEntity = response.getEntity
-            val length: Long = httpEntity.getContentLength
+          if (code != 200) {
+            System.out.println(IOUtils.toString(response.getEntity.getContent))
+            throw new RuntimeException("failed to download: " + uri)
+          }
 
-            val os = new CountingOutputStream(new FileOutputStream(file))
+          val file = new File(DownloadFxApp3.tempDestDir, StringUtils.substringBefore(FilenameUtils.getName(uri), "?"))
 
-            println(s"Downloading $uri to $file...")
+          val httpEntity = response.getEntity
+          val length = httpEntity.getContentLength
 
-            val progressThread: Thread = new Thread(new Runnable {
-              private[fx] var lastProgress: Double = .0
+          val os = new CountingOutputStream(new FileOutputStream(file))
 
-              def run
-              {
-                while (!Thread.currentThread.isInterrupted) {
-                  val bytesCopied = os.getCount
-                  val progress = bytesCopied * 100D / length
+          println(s"Downloading $uri to $file...")
 
-                  if (progress != lastProgress) {
-                    val s = s"${file.getName}: ${FileUtils.humanReadableByteCount(bytesCopied, false, false)}/${FileUtils.humanReadableByteCount(length, false, true)} ${LangUtils.toConciseString(progress, 1)}%"
+          var lastProgress = 0.0
+          var isProgressRunning = true
 
-                    setStatus(progressLabel, s)
+          spawn {
+            Thread.currentThread().setName("progressThread")
 
-                    print("\r" + s)
-                  }
+            while (isProgressRunning) {
+              val bytesCopied = os.getCount
+              val progress = bytesCopied * 100D / length
 
-                  lastProgress = progress
-                  progressBar.setProgress(bytesCopied * 1D / length)
+              if (progress != lastProgress) {
+                val s = s"${file.getName}: ${FileUtils.humanReadableByteCount(bytesCopied, false, false)}/${FileUtils.humanReadableByteCount(length, false, true)} ${LangUtils.toConciseString(progress, 1)}%"
 
-                  try {
-                    Thread.sleep(500)
-                  }
-                  catch {
-                    case e: InterruptedException => //ignore
-                  }
-                }
+                setStatus(progressLabel, s)
+
+                print("\r" + s)
               }
 
-            }, "progressThread")
+              lastProgress = progress
+              progressBar.setProgress(bytesCopied * 1D / length)
 
-            progressThread.start
-
-            ByteStreams.copy(httpEntity.getContent, os)
-
-            progressThread.interrupt
-
-            System.out.println("Download complete.")
-            DownloadFxApp3.downloadResult.set(new DownloadResult(Some(file), "", true))
-            DownloadFxApp3.downloadLatch.countDown
-          }
-          catch {
-            case e: Exception => {
-              LoggerFactory.getLogger("log").warn("", e)
-              DownloadFxApp3.downloadResult.set(new DownloadResult(None, e.getMessage, false))
-              throw Exceptions.runtime(e)
+              try {
+                Thread.sleep(500)
+              }
+              catch {
+                case e: InterruptedException => //ignore
+              }
             }
           }
-        }
-      }, "fx-downloader")
 
-      thread.start()
+          ByteStreams.copy(httpEntity.getContent, os)
+
+          isProgressRunning = false
+
+          System.out.println("Download complete.")
+          DownloadFxApp3.downloadResult.set(new DownloadResult(Some(file), "", true))
+          DownloadFxApp3.downloadLatch.countDown
+        }
+        catch {
+          case e: Exception =>
+            LoggerFactory.getLogger("log").warn("", e)
+            DownloadFxApp3.downloadResult.set(new DownloadResult(None, e.getMessage, false))
+            throw Exceptions.runtime(e)
+        }
+      }
     }))
   }
 
   protected def whenSignonForm
   {
-    browser.waitForLocation((newLoc, oldLoc) => { newLoc.contains("signon.jsp")}, -1,
-      Some((event) => {
-        setStatus(progressLabel, "waiting for the login form...")
+    browser.waitForLocation(new WaitForArg()
+      .timeoutNone()
+      .withPredicate((newLoc, oldLoc, arg) => {newLoc.contains("signon.jsp")})
+      .handler((event) => {
+//      setStatus(progressLabel, "waiting for the login form...")
+//
+//      Thread.sleep(1000)
+//
+//      browser.waitFor("$('#sso_username').length > 0", 10000)
 
-        Thread.sleep(1000)
+      println(browser.$("#sso_username"))
 
-        browser.waitFor("$('#sso_username').length > 0", 10000)
+      System.out.println("I see it all, I see it now!")
 
-        println(browser.$("#sso_username"))
-
-        System.out.println("I see it all, I see it now!")
-
-        Platform.runLater(new Runnable {
-          def run()
-          {
-            browser.initClicksJs(Random.nextInt())
-            browser.getEngine.executeScript("" +
-              "alert($('#sso_username').val('" + DownloadFxApp3.oracleUser.get + "'));\n" +
-              "alert($('#ssopassword').val('" + DownloadFxApp3.oraclePassword.get + "'));\n" +
-              "$clickIt($('.sf-btnarea a'))"
-            )
-          }
-        })
-      }))
+      Platform.runLater(new Runnable {
+        def run()
+        {
+          browser.initClicksJs(Random.nextInt())
+          browser.getEngine.executeScript("" +
+            "alert($('#sso_username').val('" + DownloadFxApp3.oracleUser.get + "'));\n" +
+            "alert($('#ssopassword').val('" + DownloadFxApp3.oraclePassword.get + "'));\n" +
+            "$clickIt($('.sf-btnarea a'))"
+          )
+        }
+      })
+    }))
   }
 
   def getLinksFromVersion:(Option[String], Option[String]) =

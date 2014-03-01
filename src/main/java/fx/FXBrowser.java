@@ -15,11 +15,15 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.VBoxBuilder;
 import javafx.stage.Stage;
+import scala.runtime.AbstractFunction1;
+import scala.runtime.AbstractFunction3;
+import scala.runtime.BoxedUnit;
 
 public class FXBrowser {
     public static class FxBrowserApp extends Application {
         @Override
         public void start(Stage stage) throws Exception {
+
             try {
                 final WookieView browser = WookieView.newBuilder()
                     .useFirebug(false)
@@ -99,10 +103,52 @@ public class FXBrowser {
                         System.out.println(browser.$("a").attr("href"));
                         System.out.println("-----");
                         System.out.println("text:" + browser.$("input[maxlength]").html());
-                        browser.
-                            $("input[maxlength]")
+//                        browser
+//                            .waitForLocation(new AbstractFunction2<String, String, Object>() {
+//                                @Override
+//                                public Object apply(String newLoc, String v2) {
+//                                    return newLoc.contains("bear");
+//                                }
+//                            }, 10000, (Option) Option.apply(new AbstractFunction1<NavigationEvent, BoxedUnit>() {
+//                                @Override
+//                                public BoxedUnit apply(NavigationEvent v1) {
+//                                    System.out.println("h3s: " + browser.$("h3"));
+//                                    System.out.println("body: " + browser.getHTML());
+//                                    System.out.println(browser.$("h3.r").asResultList());
+//                                    return BoxedUnit.UNIT;
+//                                }
+//                            }));
+
+                        browser.waitForLocation(new WaitForArg()
+                            .withPredicate(new AbstractFunction3<String, String, WaitForArg, Object>() {
+                                @Override
+                                public Object apply(String v1, String v2, WaitForArg v3) {
+                                    return v1.contains("q=");
+                                }
+                            }).handler(new AbstractFunction1<NavigationEvent, BoxedUnit>() {
+                                @Override
+                                public BoxedUnit apply(NavigationEvent e) {
+                                    System.out.println("h3s: " + browser.$("h3").html());
+                                    System.out.println(browser.$("h3.r").asResultList());
+
+                                    return BoxedUnit.UNIT;
+                                }
+                            }));
+
+                        browser.$("input[maxlength]")
                             .value("bear java deployment")
                             .submit();
+
+//                        new Thread(){
+//                            @Override
+//                            public void run() {
+////                                browser.load()
+//                                if(browser.waitFor("$('h3.r').length > 0", 3000)){
+//                                    System.out.println("h3s: " + browser.$("h3").html());
+//                                    System.out.println(browser.$("h3.r").asResultList());
+//                                }
+//                            }
+//                        }.start();
 //                        System.out.println("button:" + browser.$("input[type=submit]:first").html());
 //                        browser.$("input[type=submit]:first").click(); doesn't work
 //                        browser.$("input[maxlength]").pressEnter(); doesn't work

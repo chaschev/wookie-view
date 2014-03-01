@@ -56,10 +56,14 @@ var jQueryAggregate = function($sel, initialValue, aggregator){
     return result;
 }
 
-var jQueryChildren = function($sel){
-    jQueryAggregate($sel, [], function(r, i, el){
-        r.push(el);r;
+var jQuery_asResultArray = function($sel){
+    var res = [];
+
+    jQueryAggregate($sel, res, function(r, i, el){
+        r.push(jQuery(el));r;
     });
+
+    return res;
 };
 
 var jQueryAttrs = function($sel){
@@ -79,6 +83,10 @@ var jQueryAttrs = function($sel){
     return nodes;
 };
 
+//var jQuery_asResultArray = function($sel){
+//
+//};
+
 var jQuery_text = function($sel, isHtml){
     return jQueryAggregate($sel, '', function(r, i, el){
         if(isHtml) {
@@ -87,4 +95,4 @@ var jQuery_text = function($sel, isHtml){
             return r + el.innerText + "\n";
         }
     });
-}
+};
