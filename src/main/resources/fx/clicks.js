@@ -44,8 +44,18 @@ var printJQuery = function($sel){
     });
 }
 
-var jQueryAggregate = function($sel, initialValue, aggregator){
-    var r = $($sel);
+var newArrayFn = function(i){
+    return function($sel){
+        return $($($sel)[i]);
+    };
+}
+
+var arrayFn = function($sel){
+    return $($(sel)[i]);
+}
+
+var jQueryAggregate = function(operationFn, $sel, initialValue, aggregator){
+    var r = operationFn($sel);
 
     var result = initialValue
 
@@ -56,18 +66,19 @@ var jQueryAggregate = function($sel, initialValue, aggregator){
     return result;
 }
 
-var jQuery_asResultArray = function($sel){
+var jQuery_asResultArray = function(operationFn,$sel){
     var res = [];
 
-    jQueryAggregate($sel, res, function(r, i, el){
-        r.push(jQuery(el));r;
+    jQueryAggregate(operationFn, $sel, res, function(r, i, el){
+        r.push(jQuery(el));
+        return r;
     });
 
     return res;
 };
 
-var jQueryAttrs = function($sel){
-    var r = $($sel);
+var jQueryAttrs = function(operationFn, $sel){
+    var r = operationFn($sel);
 
     if(r.length == 0) return [];
 
@@ -87,8 +98,8 @@ var jQueryAttrs = function($sel){
 //
 //};
 
-var jQuery_text = function($sel, isHtml){
-    return jQueryAggregate($sel, '', function(r, i, el){
+var jQuery_text = function(operationFn, $sel, isHtml){
+    return jQueryAggregate(operationFn, $sel, '', function(r, i, el){
         if(isHtml) {
             return r + el.outerHTML + "\n";
         } else {

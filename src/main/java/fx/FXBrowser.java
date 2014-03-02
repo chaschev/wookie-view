@@ -16,7 +16,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.VBoxBuilder;
 import javafx.stage.Stage;
 import scala.runtime.AbstractFunction1;
-import scala.runtime.AbstractFunction3;
+import scala.runtime.AbstractFunction2;
 import scala.runtime.BoxedUnit;
 
 public class FXBrowser {
@@ -119,17 +119,17 @@ public class FXBrowser {
 //                                }
 //                            }));
 
-                        browser.waitForLocation(new WaitForArg()
-                            .withPredicate(new AbstractFunction3<String, String, WaitForArg, Object>() {
+                        browser.waitForLocation(new NavArg()
+                            .matchByPredicate(new AbstractFunction2<WookieNavigationEvent, NavArg, Object>() {
                                 @Override
-                                public Object apply(String v1, String v2, WaitForArg v3) {
-                                    return v1.contains("q=");
+                                public Object apply(WookieNavigationEvent v1, NavArg v2) {
+                                    return v1.newLoc().contains("q=");
                                 }
                             }).handler(new AbstractFunction1<NavigationEvent, BoxedUnit>() {
                                 @Override
                                 public BoxedUnit apply(NavigationEvent e) {
                                     System.out.println("h3s: " + browser.$("h3").html());
-                                    System.out.println(browser.$("h3.r").asResultList());
+                                    System.out.println("results: " + browser.$("h3.r").asResultList());
 
                                     return BoxedUnit.UNIT;
                                 }

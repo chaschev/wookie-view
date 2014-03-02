@@ -143,9 +143,10 @@ class DownloadFxApp3 extends Application{
 
   def whenDownloadStarts()
   {
-    browser.waitForLocation(new WaitForArg()
+    browser.waitForLocation(new NavArg()
       .timeoutNone()
-      .withPredicate((uri, oldLoc, arg) => { uri.contains("download.oracle") && uri.contains("?")})
+      // todo: change page ready to ANY?
+      .matchByPredicate((w, arg) => { w.newLoc.contains("download.oracle") && w.newLoc.contains("?")})
       .isPageReadyEvent(false)
       .handler((event) => {
       // will be here after
@@ -153,8 +154,7 @@ class DownloadFxApp3 extends Application{
       // download -> fill form -> * logged in * -> here -> download
       val navEvent:OkNavigationEvent = event.asInstanceOf[OkNavigationEvent]
 
-      val uri = navEvent.newLocation
-
+      val uri = navEvent.wookieEvent.newLoc
 
       spawn {
         Thread.currentThread().setName("fx-downloader")
@@ -232,9 +232,9 @@ class DownloadFxApp3 extends Application{
 
   protected def whenSignonForm
   {
-    browser.waitForLocation(new WaitForArg()
+    browser.waitForLocation(new NavArg()
       .timeoutNone()
-      .withPredicate((newLoc, oldLoc, arg) => {newLoc.contains("signon.jsp")})
+      .matchByPredicate((w, arg) => {w.newLoc.contains("signon.jsp")})
       .handler((event) => {
 //      setStatus(progressLabel, "waiting for the login form...")
 //
@@ -320,7 +320,7 @@ class DownloadFxApp3 extends Application{
    */
   private[fx] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit)
   {
-    browser.load(archiveUrl, Some(() => {
+    browser.load(archiveUrl, Some((event:NavigationEvent) => {
         try {
           val aBoolean: Boolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadFxApp3.version + "', true, 'linux');").asInstanceOf[Boolean]
 
