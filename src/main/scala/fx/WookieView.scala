@@ -148,26 +148,35 @@ class WookieBuilder {
 
 }
 
-class DirectJQueryWrapper(selector:String, index:Int, wookie:WookieView) extends JQueryWrapper(selector, wookie){
+/**
+ * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
+ */
+abstract class CompositionJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
+  def function:String
+  
   override def attr(name: String): String = {
-    interact(s"newArrayFn($index)('$escapedSelector').attr('$name')").asInstanceOf[String]
+    interact(s"$function('$escapedSelector').attr('$name')").asInstanceOf[String]
   }
 
   override def attrs(): List[String] = {
-    interact(s"jQueryAttrs(newArrayFn($index), '$escapedSelector')").asInstanceOf[List[String]]
+    interact(s"jQueryAttrs($function, '$escapedSelector')").asInstanceOf[List[String]]
   }
 
   override def text(): String = {
-    interact(s"jQuery_text(newArrayFn($index), '$escapedSelector', false)".toString).asInstanceOf[String]
+    interact(s"jQuery_text($function, '$escapedSelector', false)".toString).asInstanceOf[String]
   }
 
   override def html(): String = {
-    interact(s"jQuery_text(newArrayFn($index), '$escapedSelector', true)".toString).asInstanceOf[String]
+    interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
   }
+}
 
-  override def toString: String = {
-    html()
-  }
+class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
+  val function = s"newArrayFn($index)"
+}
+
+class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
+  val function = s"newFindFn($findSelector)"
 }
 
 class JQueryWrapper(selector:String, wookie:WookieView){
@@ -198,6 +207,12 @@ class JQueryWrapper(selector:String, wookie:WookieView){
 
   def submit():JQueryWrapper = {
     interact(s"submitEnclosingForm('$escapedSelector')")
+    this
+  }
+
+  def find(findSelector:String):JQueryWrapper = {
+    val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
+    interact(s"jQueryFind(jQuery, '$escapedSelector', '$escapedFindSelector')")
     this
   }
 
@@ -277,7 +292,7 @@ class JQueryWrapper(selector:String, wookie:WookieView){
     println(r)
 
     for(i <- 0 until l){
-      list += new DirectJQueryWrapper(selector, i, wookie)
+      list += new ArrayItemJQueryWrapper(selector, i, wookie)
     }
 //    var l:Long = r.getMember("length").asInstanceOf[Long]
 

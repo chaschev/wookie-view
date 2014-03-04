@@ -1,17 +1,17 @@
 var $clickIt = function(sel){
     clickIt(jQuery(sel))
-}
+};
 
 var clickIt = function($el){
   var el = $el[0];
   var etype = 'click';
 
   clickDom(el, etype);
-}
+};
 
 var submitEnclosingForm = function(sel){
     jQuery(sel).closest('form').submit();
-}
+};
 
 var pressKey = function(sel, code){
     var p = {which: code, keyCode: code};
@@ -20,7 +20,7 @@ var pressKey = function(sel, code){
     jQuery(sel).trigger(jQuery.Event("keyup", p));
     jQuery(sel).trigger(jQuery.Event("keypress", p));
 //    alert("triggered " + JSON.stringify(p));
-}
+};
 
 var clickDom = function(el, etype){
   if (el.fireEvent) {
@@ -33,7 +33,7 @@ var clickDom = function(el, etype){
 
     el.dispatchEvent(evObj);
   }
-}
+};
 
 var printJQuery = function($sel){
     var r = $($sel);
@@ -42,17 +42,23 @@ var printJQuery = function($sel){
     r.each(function(index, el){
         alert(el.outerHTML);
     });
-}
+};
 
 var newArrayFn = function(i){
     return function($sel){
         return $($($sel)[i]);
     };
-}
+};
 
 var arrayFn = function($sel){
     return $($(sel)[i]);
-}
+};
+
+var newFindFn = function($findSel){
+    return function($sel){
+        return $($sel).find($findSel);
+    };
+};
 
 var jQueryAggregate = function(operationFn, $sel, initialValue, aggregator){
     var r = operationFn($sel);
@@ -64,9 +70,13 @@ var jQueryAggregate = function(operationFn, $sel, initialValue, aggregator){
     });
 
     return result;
-}
+};
 
-var jQuery_asResultArray = function(operationFn,$sel){
+var jQueryFind = function(operationFn, $sel, $findSel){
+    return operationFn($sel).find($findSel);
+};
+
+var jQuery_asResultArray = function(operationFn, $sel){
     var res = [];
 
     jQueryAggregate(operationFn, $sel, res, function(r, i, el){
