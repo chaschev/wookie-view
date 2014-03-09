@@ -15,8 +15,8 @@ var clickItem = function(operationFn, $sel){
     clickIt(operationFn($sel));
 };
 
-var submitEnclosingForm = function(sel){
-    jQuery(sel).closest('form').submit();
+var submitEnclosingForm = function(operationFn, sel){
+    operationFn(sel).closest('form').submit();
 };
 
 var pressKey = function(sel, code){
@@ -44,6 +44,14 @@ var clickDom = function(el, etype){
 var printJQuery = function($sel){
     var r = $($sel);
     alert("found " + r.length + " results for " + $sel + ": " + r.html());
+
+    r.each(function(index, el){
+        alert(el.outerHTML);
+    });
+};
+
+var printJQuery2 = function(r){
+    alert("found " + r.length + " results : " + r.html());
 
     r.each(function(index, el){
         alert(el.outerHTML);
@@ -84,6 +92,18 @@ var jQueryAggregate = function(operationFn, $sel, initialValue, aggregator){
 
 var jQueryFind = function(operationFn, $sel, $findSel){
     return operationFn($sel).find($findSel);
+};
+
+var jQuerySetValue = function(operationFn, $sel, name, value){
+    return operationFn($sel).val(value);
+};
+
+var jQueryGetAttr = function(operationFn, $sel, name){
+    return operationFn($sel).attr(name);
+};
+
+var jQuerySetAttr = function(operationFn, $sel, name, value){
+    return operationFn($sel).attr(name, value);
 };
 
 var jQuery_asResultArray = function(operationFn, $sel){

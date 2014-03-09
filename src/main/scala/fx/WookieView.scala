@@ -177,7 +177,7 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
   val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
 
   def attr(name: String): String = {
-    interact(s"$function('$escapedSelector').attr('$name')").asInstanceOf[String]
+    interact(s"jQueryGetAttr($function, '$escapedSelector', '$name')").asInstanceOf[String]
   }
 
   def attrs(): List[String] = {
@@ -208,17 +208,17 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
 
 
   def attr(name:String, value:String):JQueryWrapper = {
-    interact(s"jQuery('$escapedSelector').attr('$name', '$value')")
+    interact(s"jQuerySetAttr($function, '$escapedSelector', '$name', '$value')")
     this
   }
 
   def value(value:String):JQueryWrapper = {
-    interact(s"jQuery('$escapedSelector').val('$value')")
+    interact(s"jQuerySetValue($function, '$escapedSelector').val('$value')")
     this
   }
 
   def submit():JQueryWrapper = {
-    interact(s"submitEnclosingForm('$escapedSelector')")
+    interact(s"submitEnclosingForm($function, '$escapedSelector')")
     this
   }
 
@@ -240,8 +240,6 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
 
       list += new DirectWrapper(true, sObject, wookie)
     }
-
-    println("leaving!")
 
     list.toList
   }
@@ -317,7 +315,7 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
   }
 
   def asResultList():List[JQueryWrapper] = {
-    val r = interact(s"jQuery('$escapedSelector')").asInstanceOf[JSObject]
+    val r = interact(s"$function('$escapedSelector')").asInstanceOf[JSObject]
 
     _jsJQueryToResultList(r)
   }
@@ -815,6 +813,10 @@ class WookieView(builder: WookieBuilder) extends Pane {
    */
   def $(jQuerySelector: String):JQueryWrapper =
   {
-    new SelectorJQueryWrapper(jQuerySelector, this)
+    val sel = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
+
+    val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]
+
+    new DirectWrapper(false, $obj, this)
   }
 }

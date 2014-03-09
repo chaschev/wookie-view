@@ -36,7 +36,7 @@ object SearchAndStarWookie {
           wookie.waitForLocation(new NavArg()
             .matchByPredicate((v1, arg) => {v1.newLoc.contains("q=")})
             .handler((e) => {
-            println("h3s: " + $("h3").html())
+            println("h3s: " + $("h3.r").html())
             println("results: " + $("h3.r").asResultList())
 
             val githubLink = $("h3.r").asResultList().find(_.text().contains("chaschev"))
