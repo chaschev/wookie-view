@@ -31,12 +31,13 @@ object DownloadFxApp3{
 
   @volatile
   var oraclePassword: Option[String] = None
-  final val downloadLatch: CountDownLatch = new CountDownLatch(1)
-  private final val appStartedLatch: CountDownLatch = new CountDownLatch(1)
 
-  final val downloadResult: AtomicReference[DownloadResult] = new AtomicReference[DownloadResult]
+  final val downloadLatch = new CountDownLatch(1)
+  private final val appStartedLatch = new CountDownLatch(1)
 
-  protected final val instance: AtomicReference[DownloadFxApp3] = new AtomicReference[DownloadFxApp3]
+  final val downloadResult = new AtomicReference[DownloadResult]
+
+  protected final val instance = new AtomicReference[DownloadFxApp3]
 
   @volatile
   var version: String = "7u51"
@@ -320,7 +321,7 @@ class DownloadFxApp3 extends Application{
    */
   private[fx] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit)
   {
-    browser.load(archiveUrl, Some((event:NavigationEvent) => {
+    browser.load(archiveUrl, (event:NavigationEvent) => {
         try {
           val aBoolean: Boolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadFxApp3.version + "', true, 'linux');").asInstanceOf[Boolean]
 
@@ -333,6 +334,5 @@ class DownloadFxApp3 extends Application{
           case e: Exception => e.printStackTrace
         }
       })
-    )
   }
 }

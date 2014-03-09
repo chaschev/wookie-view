@@ -1,114 +1,101 @@
 package fx
 
 import javafx.application.Application
-import javafx.beans.value.ChangeListener
-import javafx.beans.value.ObservableValue
-import javafx.event.ActionEvent
-import javafx.event.EventHandler
 import javafx.scene.Scene
-import javafx.scene.control._
-import javafx.scene.input.KeyCode
-import javafx.scene.input.KeyCodeCombination
-import javafx.scene.input.KeyCombination
-import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
 import javafx.scene.layout.VBox
 import javafx.stage.Stage
-import scala.runtime.BoxedUnit
+import org.slf4j.LoggerFactory
+import java.util.concurrent.{TimeUnit, ConcurrentHashMap, CountDownLatch}
+import java.util.concurrent.atomic.AtomicReference
+import chaschev.util.Exceptions
+import scala.compat.Platform
+import javafx.application
+import javafx.scene.text.Text
 
+class WookieScenario(_url:String, _init:Option[()=>Unit], _panel:()=>WookiePanel, _procedure: (WookiePanel, WookieView, (String)=>JQueryWrapper)=>Unit){
+  def newPanel() = _panel.apply()
+
+  val url = _url
+  val init = _init
+  val procedure = _procedure
+}
 
 object WookieSandboxApp {
+  final val logger = LoggerFactory.getLogger(WookieSandboxApp.getClass)
+
+  private final val appStartedLatch = new CountDownLatch(1)
+
+  protected final val instance = new AtomicReference[WookieSandboxApp]
+  protected final val initialStage = new AtomicReference[Stage]
+
+  private final val scenarios = new ConcurrentHashMap[String, WookieScenario]
+
   def main(args: Array[String])
   {
     Application.launch(classOf[WookieSandboxApp], args: _*)
   }
+  
+  def start():WookieSandboxApp = {
+    try {
+      new Thread(){
+        override def run(): Unit = {
+          Application.launch(classOf[WookieSandboxApp], Array.empty[String]: _*)
+        }
+      }.start()
+
+      appStartedLatch.await(2, TimeUnit.SECONDS)
+      instance.get()
+    }
+    catch {
+      case e:Exception => throw Exceptions.runtime(e)
+    }
+  }
+  
+  def setMainScenario(ws:WookieScenario) = {
+    scenarios.put(ws.url, ws)
+  }
+}
+
+class WookieStage(stage: Stage, wookiePanel: WookiePanel) {
+  {
+//    val scene = new Scene(new VBox(new Text("keke")))
+    val scene = new Scene(wookiePanel)
+
+    stage.setScene(scene)
+    stage.setWidth(1024)
+    stage.setHeight(768)
+
+    VBox.setVgrow(wookiePanel, Priority.ALWAYS)
+  }
+
+  def show() = stage.show()
 }
 
 class WookieSandboxApp extends Application {
   def start(stage: Stage)
   {
-    try
-      val initialUrl = "http://www.google.com"
-      val wookie = WookieView.newBuilder
-        .useFirebug(false)
-        .useJQuery(true)
-        .build
+    WookieSandboxApp.instance.set(this)
+    WookieSandboxApp.initialStage.set(stage)
 
-      val location = new TextField(initialUrl)
-      val codeArea = new TextArea()
-      val go = new Button("Go")
+//    new WookiePanel(stage, )
+  }
 
-      val goAction = new EventHandler[ActionEvent] {
-        def handle(arg0: ActionEvent)
-        {
-          wookie.load(location.getText)
-        }
+  def runOnStage(ws:WookieScenario) = {
+    application.Platform.runLater(new Runnable {
+      override def run(): Unit = {
+        val panel = ws.newPanel()
+
+        new WookieStage(new Stage(), panel).show()
+
+        if(ws.init.isDefined) ws.init.get.apply()
+
+        val wookie = panel.wookie
+
+        wookie.load(ws.url, (e:NavigationEvent) => {
+          ws.procedure.apply(panel, wookie, (s) => wookie.$(s))
+        })
       }
-
-      go.setOnAction(goAction)
-
-      val menuItem = new MenuItem("Go!")
-
-      menuItem.setAccelerator(new KeyCodeCombination(KeyCode.G, KeyCombination.CONTROL_DOWN))
-      menuItem.setOnAction(goAction)
-
-      wookie.getEngine.locationProperty.addListener(new ChangeListener[String] {
-        def changed(observableValue: ObservableValue[_ <: String], s: String, newLoc: String)
-        {
-          System.out.println("location changed to: " + newLoc)
-        }
-      })
-
-      val toolbar = new HBox
-      toolbar.getChildren.addAll(location, go)
-      toolbar.setFillHeight(true)
-
-      val menu = new Menu("File")
-      menu.getItems.addAll(menuItem)
-
-      val menuBar = new MenuBar
-      menuBar.getMenus.add(menu)
-
-      val vBox = new VBox()
-
-      vBox.getChildren.addAll(menuBar, toolbar, codeArea, wookie)
-      vBox.setFillWidth(true)
-
-      val scene = new Scene(vBox)
-      stage.setScene(scene)
-      stage.setWidth(1024)
-      stage.setHeight(768)
-      stage.show
-
-      VBox.setVgrow(wookie, Priority.ALWAYS)
-
-      wookie.load(initialUrl, Some((e: NavigationEvent) => {
-        System.out.println("-----")
-        System.out.println(wookie.$("input").html)
-        System.out.println("-----")
-        System.out.println(wookie.$("div").find("div").html)
-        System.out.println("-----")
-        System.out.println(wookie.$("div").text)
-        System.out.println("-----")
-        System.out.println(wookie.$("a").attr("href"))
-        System.out.println("-----")
-        System.out.println("text:" + wookie.$("input[maxlength]").html)
-
-        wookie.waitForLocation(new NavArg().matchByPredicate((event, arg) => {
-          event.newLoc.contains("q=")
-        }).handler((e) => {
-          System.out.println("h3s: " + wookie.$("h3").html)
-          System.out.println("results: " + wookie.$("h3.r").asResultList)
-        }))
-
-        wookie.$("input[maxlength]").value("bear java deployment").submit
-
-        return BoxedUnit.UNIT
-      }))
-
-    catch {
-      case e: Exception =>
-        e.printStackTrace
-    }
+    })
   }
 }

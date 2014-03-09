@@ -111,7 +111,7 @@ class NavArg{
 
 class WookieBuilder {
   var createWebView: Boolean = true
-  var useFirebug: Boolean = true
+  var useFirebug: Boolean = false
   var useJQuery: Boolean = false
   var includeJsScript: Option[String] = None
   var includeJsUrls: mutable.MutableList[String] = new mutable.MutableList[String]
@@ -121,31 +121,11 @@ class WookieBuilder {
     new WookieView(this)
   }
 
-  def createWebView(b: Boolean): WookieBuilder =
-  {
-    createWebView = b; this
-  }
-
-  def useJQuery(b: Boolean): WookieBuilder =
-  {
-    useJQuery = b; this
-  }
-
-  def useFirebug(b: Boolean): WookieBuilder =
-  {
-    useFirebug = b; this
-  }
-
-  def includeJsScript(s: String): WookieBuilder =
-  {
-    includeJsScript = Some(s); this
-  }
-
-  def addScriptUrls(s: String): WookieBuilder =
-  {
-    includeJsUrls += s; this
-  }
-
+  def createWebView(b: Boolean): WookieBuilder = { createWebView = b; this }
+  def useJQuery(b: Boolean): WookieBuilder = { useJQuery = b; this }
+  def useFirebug(b: Boolean): WookieBuilder = { useFirebug = b; this }
+  def includeJsScript(s: String): WookieBuilder = { includeJsScript = Some(s); this }
+  def addScriptUrls(s: String): WookieBuilder = { includeJsUrls += s; this }
 }
 
 /**
@@ -319,6 +299,12 @@ object WookieView {
     new WookieBuilder()
   }
 
+  def logOnAlert(message: String)
+  {
+    LoggerFactory.getLogger("wk-alert").info(message)
+  }
+
+
   final val logger: Logger = LoggerFactory.getLogger(classOf[WookieView])
 }
 
@@ -379,7 +365,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     webEngine.setOnAlert(new EventHandler[WebEvent[String]] {
       def handle(webEvent: WebEvent[String])
       {
-        LoggerFactory.getLogger("wk-alert").info(webEvent.getData)
+        WookieView.logOnAlert(webEvent.getData)
       }
     })
 
@@ -432,6 +418,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       }
     }, 50, TimeUnit.MILLISECONDS)
   }
+
 
   protected def scanHandlers(w:WookieNavigationEvent):mutable.MutableList[NavigationEvent] = {
     val it = navigationPredicates.iterator()
@@ -519,7 +506,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     var isOk = false
 
-
     jsHandlers.put(eventId, new JSHandler(eventId, latch, Some(() => {
       try {
         if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
@@ -584,7 +570,11 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }))
   }
 
-  def load(location: String, onLoad: Option[(NavigationEvent) => Unit] = None): WookieView = {
+  def load(location: String, onLoad: (NavigationEvent) => Unit):WookieView = {
+    load(location, Some(onLoad))
+  }
+
+  protected def load(location: String, onLoad: Option[(NavigationEvent) => Unit] = None): WookieView = {
     val arg = new NavArg()
     
     if(onLoad.isDefined) arg.handler(onLoad.get)
@@ -592,6 +582,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
     load(location, arg)
   }
 
+  /**
+   * Gives more control options (i.e. customize url matching, set timeout, set sync or async).
+   */
   def load(location: String, arg:NavArg): WookieView =
   {
     WookieView.logger.info("navigating to {}", location)
