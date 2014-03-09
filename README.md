@@ -1,4 +1,4 @@
 wookie-view
 ===========
 
-A wrapper for the WebView to utilize jQuery &amp; page navigation.
+A lightweight alternative to Selenium. A wrapper for WebView (JavaFX) to utilize jQuery &amp; page navigation. 
