@@ -27,26 +27,34 @@ object SearchAndStarWookie {
       new WookieScenario("http://www.google.com", None,
         defaultPanel,
         (wookiePanel, wookie, $) => {
-          println($("input").html() + "-----\n")
-          println($("div").html() + "-----\n")
-          println($("div").text() + "-----\n")
-          println($("a").attr("href") + "-----\n")
-          println($("input[maxlength]").html() + "-----\n")
-
-          wookie.waitForLocation(new NavArg()
-            .matchByPredicate((v1, arg) => {v1.newLoc.contains("q=")})
-            .handler((e) => {
-            println("h3s: " + $("h3.r").html())
+          wookie.waitForLocation(new WaitArg("google search results")
+            .matchByLocation(_.contains("q="))
+            .whenLoaded((e) => {
             println("results: " + $("h3.r").asResultList())
 
-            val githubLink = $("h3.r").asResultList().find(_.text().contains("chaschev"))
+            val githubLink = $("h3.r a").asResultList().find(_.text().contains("chaschev"))
 
-            val aLink = githubLink.get.find("a")(0)
+            githubLink.get.clickLink()
+          }))
 
-            println("1:" + githubLink.get.html())
-            println("2:" + aLink.html())
+          wookie.waitForLocation(new WaitArg("git wookie not logged in")
+            .matchByLocation(_.contains("/wookie-view"))
+            .whenLoaded((e) => { $("a.button.signin").clickLink() })
+          )
 
-            aLink.click()
+          wookie.waitForLocation(new WaitArg("git login")
+            .matchByLocation(_.contains("github.com/login"))
+            .whenLoaded((e) => {
+
+            wookie.waitForLocation(new WaitArg("wookie logged in")
+              .matchByLocation(_.contains("/wookie-view"))
+              .whenLoaded((e) => {
+              $(".star-button.unstarred:visible").mouseClick()
+            }))
+
+            $("#login_field").value("chaschev")
+            $("#password").value("shotgun8")
+              .submit()
           }))
 
           $("input[maxlength]")
@@ -54,5 +62,4 @@ object SearchAndStarWookie {
             .submit()
         }))
   }
-
 }

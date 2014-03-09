@@ -34,7 +34,7 @@ class WookiePanel(builder:WookiePanelBuilder) extends VBox with WookiePanelField
   val prevButton = new Button("<")
   val nextButton = new Button(">")
 
-  val jsButton = new Button("JS")
+  val jsButton = new Button("Run JS")
   val go = new Button("Go")
 
   val wookie:WookieView = builder.wookie
@@ -54,9 +54,11 @@ class WookiePanel(builder:WookiePanelBuilder) extends VBox with WookiePanelField
     jsArea.focusedProperty().addListener(new ChangeListener[lang.Boolean] {
       def changed(observableValue: ObservableValue[_ <: lang.Boolean], s: lang.Boolean, newValue: lang.Boolean)
       {
-        if(jsArea.getText.equals(JS_INVITATION)) jsArea.setText("")
-        jsArea.positionCaret(1)
-        jsArea.positionCaret(0)
+        if(newValue){
+          if(jsArea.getText.equals(JS_INVITATION)) jsArea.setText("")
+        }else{
+          if(jsArea.getText.trim.equals("")) jsArea.setText(JS_INVITATION)
+        }
       }
     })
 

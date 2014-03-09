@@ -144,12 +144,12 @@ class DownloadFxApp3 extends Application{
 
   def whenDownloadStarts()
   {
-    browser.waitForLocation(new NavArg()
+    browser.waitForLocation(new WaitArg()
       .timeoutNone()
       // todo: change page ready to ANY?
       .matchByPredicate((w, arg) => { w.newLoc.contains("download.oracle") && w.newLoc.contains("?")})
       .isPageReadyEvent(false)
-      .handler((event) => {
+      .whenLoaded((event) => {
       // will be here after
       // clicking accept license and link -> * not logged in * -> here -> download -> redirect to login
       // download -> fill form -> * logged in * -> here -> download
@@ -233,10 +233,10 @@ class DownloadFxApp3 extends Application{
 
   protected def whenSignonForm
   {
-    browser.waitForLocation(new NavArg()
+    browser.waitForLocation(new WaitArg()
       .timeoutNone()
       .matchByPredicate((w, arg) => {w.newLoc.contains("signon.jsp")})
-      .handler((event) => {
+      .whenLoaded((event) => {
 //      setStatus(progressLabel, "waiting for the login form...")
 //
 //      Thread.sleep(1000)
