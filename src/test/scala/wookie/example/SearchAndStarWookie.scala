@@ -38,6 +38,15 @@ object SearchAndStarWookie {
             .handler((e) => {
             println("h3s: " + $("h3").html())
             println("results: " + $("h3.r").asResultList())
+
+            val githubLink = $("h3.r").asResultList().find(_.text().contains("chaschev"))
+
+            val aLink = githubLink.get.find("a")(0)
+
+            println("1:" + githubLink.get.html())
+            println("2:" + aLink.html())
+
+            aLink.click()
           }))
 
           $("input[maxlength]")

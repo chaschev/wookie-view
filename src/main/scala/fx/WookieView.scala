@@ -132,23 +132,7 @@ class WookieBuilder {
  * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
  */
 abstract class CompositionJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
-  def function:String
-  
-  override def attr(name: String): String = {
-    interact(s"$function('$escapedSelector').attr('$name')").asInstanceOf[String]
-  }
 
-  override def attrs(): List[String] = {
-    interact(s"jQueryAttrs($function, '$escapedSelector')").asInstanceOf[List[String]]
-  }
-
-  override def text(): String = {
-    interact(s"jQuery_text($function, '$escapedSelector', false)".toString).asInstanceOf[String]
-  }
-
-  override def html(): String = {
-    interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
-  }
 }
 
 class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
@@ -156,19 +140,72 @@ class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView) exte
 }
 
 class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
-  val function = s"newFindFn($findSelector)"
+//  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
+  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
+  val function = s"newFindFn('$escapedSelector', '$escapedFindSelector')"
 }
 
-class JQueryWrapper(selector:String, wookie:WookieView){
+class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView) extends CompositionJQueryWrapper("", wookie){
+  val function = "directFn"
+
+  private def assign() = {
+    val engine = wookie.getEngine
+    val window = engine.executeScript("window").asInstanceOf[JSObject]
+
+    if(!isDom){
+      window.setMember("__javaToJS", jsObject)
+    }else{
+      window.setMember("__javaToJS", jsObject)
+
+      engine.executeScript("window.__javaToJS = jQuery(window.__javaToJS); window.__javaToJS")
+    }
+  }
+
+  override def interact(script: String, timeoutMs: Long): AnyRef = {
+    assign()
+    super.interact(script, timeoutMs)
+  }
+}
+
+class SelectorJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
+  val function = "jQuery"
+}
+
+abstract class JQueryWrapper(selector:String, wookie:WookieView){
+  val function:String
+
   val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
 
-  def attrs():List[String] = {
-    interact(s"jQueryAttrs(jQuery, '$escapedSelector')").asInstanceOf[List[String]]
+  def attr(name: String): String = {
+    interact(s"$function('$escapedSelector').attr('$name')").asInstanceOf[String]
   }
 
-  def attr(name:String):String = {
-    interact(s"jQuery('$escapedSelector').attr('$name')").asInstanceOf[String]
+  def attrs(): List[String] = {
+    interact(s"jQueryAttrs($function, '$escapedSelector')").asInstanceOf[List[String]]
   }
+
+  def text(): String = {
+    interact(s"jQuery_text($function, '$escapedSelector', false)".toString).asInstanceOf[String]
+  }
+
+  def html(): String = {
+    interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
+  }
+
+  def click(): JQueryWrapper = {
+    interact(s"clickItem($function, '$escapedSelector')".toString)
+    this
+  }
+
+  def find(findSelector: String): List[JQueryWrapper] = {
+    val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
+    val r = interact(s"jQueryFind($function, '$escapedSelector', '$escapedFindSelector')").asInstanceOf[JSObject]
+    _jsJQueryToResultList(r)
+    //    asResultList()
+
+    //    new FindJQueryWrapper(selector, findSelector, wookie)
+  }
+
 
   def attr(name:String, value:String):JQueryWrapper = {
     interact(s"jQuery('$escapedSelector').attr('$name', '$value')")
@@ -180,21 +217,50 @@ class JQueryWrapper(selector:String, wookie:WookieView){
     this
   }
 
-  def click():JQueryWrapper = {
-    interact(s"$$clickIt('$escapedSelector')")
-    this
-  }
-
   def submit():JQueryWrapper = {
     interact(s"submitEnclosingForm('$escapedSelector')")
     this
   }
 
-  def find(findSelector:String):JQueryWrapper = {
-    val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
-    interact(s"jQueryFind(jQuery, '$escapedSelector', '$escapedFindSelector')")
-    this
+  protected def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] =
+  {
+    var l = r.getMember("length").asInstanceOf[Int]
+
+    val list = new mutable.MutableList[JQueryWrapper]
+
+    println(s"jQuery object, length=$l")
+
+    for (i <- 0 until l) {
+//      list += new ArrayItemJQueryWrapper(selector, i, wookie)
+      val slot = r.getSlot(i)
+
+      println(slot, i)
+
+      val sObject = slot.asInstanceOf[JSObject]
+
+      list += new DirectWrapper(true, sObject, wookie)
+    }
+
+    println("leaving!")
+
+    list.toList
   }
+
+  protected def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] =
+  {
+    var l = r.getMember("length").asInstanceOf[Int]
+
+    val list = new mutable.MutableList[JQueryWrapper]
+
+    println(s"jQuery object, length=$l")
+
+    for (i <- 0 until l) {
+      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie)
+    }
+
+    list.toList
+  }
+
 
   def pressKey(code:Int):JQueryWrapper = {
     interact(s"pressKey('$escapedSelector', $code)")
@@ -204,16 +270,6 @@ class JQueryWrapper(selector:String, wookie:WookieView){
   def pressEnter():JQueryWrapper = {
     pressKey(13)
     this
-  }
-
-  def html():String = {
-    interact(s"jQuery_text(jQuery, '$escapedSelector', true)".toString).asInstanceOf[String]
-//    return "keke"
-//    "keke"
-  }
-
-  def text():String = {
-    interact(s"jQuery_text(jQuery, '$escapedSelector', false)").asInstanceOf[String]
   }
 
   def interact(script:String, timeoutMs:Long = 5000):AnyRef = {
@@ -242,7 +298,7 @@ class JQueryWrapper(selector:String, wookie:WookieView){
       if(System.currentTimeMillis() - started > timeoutMs) expired = true
     }
 
-    if(expired == true){
+    if(expired){
       throw new TimeoutException(s"JS was not executed in ${timeoutMs}ms")
     }
 
@@ -261,23 +317,13 @@ class JQueryWrapper(selector:String, wookie:WookieView){
   }
 
   def asResultList():List[JQueryWrapper] = {
-    println(html())
-
     val r = interact(s"jQuery('$escapedSelector')").asInstanceOf[JSObject]
-    var l = r.getMember("length").asInstanceOf[Int]
 
-    val list = new mutable.MutableList[JQueryWrapper]
-
-    println(l)
-    println(r)
-
-    for(i <- 0 until l){
-      list += new ArrayItemJQueryWrapper(selector, i, wookie)
-    }
-//    var l:Long = r.getMember("length").asInstanceOf[Long]
-
-    list.toList
+    _jsJQueryToResultList(r)
   }
+
+
+
 
   override def toString: String = html()
 }
@@ -769,6 +815,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
    */
   def $(jQuerySelector: String):JQueryWrapper =
   {
-    new JQueryWrapper(jQuerySelector, this)
+    new SelectorJQueryWrapper(jQuerySelector, this)
   }
 }

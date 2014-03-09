@@ -9,6 +9,12 @@ var clickIt = function($el){
   clickDom(el, etype);
 };
 
+var clickItem = function(operationFn, $sel){
+    alert("about to click: " + jQuery_text(operationFn, $sel, true));
+
+    clickIt(operationFn($sel));
+};
+
 var submitEnclosingForm = function(sel){
     jQuery(sel).closest('form').submit();
 };
@@ -54,9 +60,13 @@ var arrayFn = function($sel){
     return $($(sel)[i]);
 };
 
-var newFindFn = function($findSel){
+var directFn = function($sel){
+    return window.__javaToJS;
+};
+
+var newFindFn = function($rootSel, $findSel){
     return function($sel){
-        return $($sel).find($findSel);
+        return $($rootSel).find($findSel).find($sel);
     };
 };
 
