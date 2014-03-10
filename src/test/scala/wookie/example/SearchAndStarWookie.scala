@@ -6,11 +6,11 @@ import fx.WookieScenario
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
-class SearchAndStarWookie {
-
-}
 
 object SearchAndStarWookie {
+  val login = "change login"
+  val password = "change password"
+
   val defaultPanel = () => {
     val wookieView = WookieView.newBuilder.useJQuery(true).build
 
@@ -52,8 +52,8 @@ object SearchAndStarWookie {
               $(".star-button.unstarred:visible").mouseClick()
             }))
 
-            $("#login_field").value("chaschev")
-            $("#password").value("shotgun8")
+            $("#login_field").value(login)
+            $("#password").value(password)
               .submit()
           }))
 

@@ -26,11 +26,7 @@ import scala.concurrent.ExecutionContext
 object DownloadFxApp3{
   final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
 
-  @volatile
-  var oracleUser: Option[String] = None
 
-  @volatile
-  var oraclePassword: Option[String] = None
 
   final val downloadLatch = new CountDownLatch(1)
   private final val appStartedLatch = new CountDownLatch(1)
@@ -38,6 +34,12 @@ object DownloadFxApp3{
   final val downloadResult = new AtomicReference[DownloadResult]
 
   protected final val instance = new AtomicReference[DownloadFxApp3]
+
+  @volatile
+  var oracleUser: Option[String] = None
+
+  @volatile
+  var oraclePassword: Option[String] = None
 
   @volatile
   var version: String = "7u51"
@@ -72,9 +74,9 @@ class DownloadFxApp3 extends Application{
     createScene(stage)
   }
 
-  val progressLabel: Label = new Label("Retrieving a link...")
+  val progressLabel = new Label("Retrieving a link...")
 
-  val progressBar: ProgressBar = new ProgressBar(0)
+  val progressBar = new ProgressBar(0)
   var browser: WookieView = null
 
   def createScene(stage: Stage)
@@ -153,7 +155,7 @@ class DownloadFxApp3 extends Application{
       // will be here after
       // clicking accept license and link -> * not logged in * -> here -> download -> redirect to login
       // download -> fill form -> * logged in * -> here -> download
-      val navEvent:OkNavigationEvent = event.asInstanceOf[OkNavigationEvent]
+      val navEvent = event.asInstanceOf[OkNavigationEvent]
 
       val uri = navEvent.wookieEvent.newLoc
 
