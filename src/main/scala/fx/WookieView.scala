@@ -573,6 +573,25 @@ class WookieView(builder: WookieBuilder) extends Pane {
     record
   }
 
+  private[this] def checkPredicate($predicate: String, periodMs: Long): Boolean = {
+    var result = false
+
+    val predicateLatch: CountDownLatch = new CountDownLatch(1)
+
+    Platform.runLater(new Runnable {
+      def run()
+      {
+        result = webEngine.executeScript($predicate).asInstanceOf[Boolean]
+        predicateLatch.countDown()
+      }
+    })
+
+    // this should be instant, but we place limitation for safety reasons
+    predicateLatch.await(periodMs, TimeUnit.MILLISECONDS)
+
+    result
+  }
+
   def waitFor($predicate: String, timeoutMs: Int = 3000): Boolean =
   {
     val startedAt = System.currentTimeMillis
@@ -581,39 +600,22 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     val waitLatch = new CountDownLatch(1)
 
-    var isOk = false
+    var isPredicateTrue = false
 
     jsHandlers.put(eventId, new JSHandler(eventId, latch, Some(() => {
       try {
-        if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-          return false
-        }
-
+        // a time period to check the predicate condition
         val periodMs: Int = timeoutMs / 20 + 2
 
+        // timeoutMs expiration flag
         var expired = false
 
-        while (!expired && !isOk) {
+        while (!expired && !isPredicateTrue) {
           val time = System.currentTimeMillis
           if (time - startedAt > timeoutMs) {
             expired = true
           } else {
-
-            var result = false
-
-            val predicateLatch: CountDownLatch = new CountDownLatch(1)
-
-            Platform.runLater(new Runnable {
-              def run()
-              {
-                result = webEngine.executeScript($predicate).asInstanceOf[Boolean]
-                predicateLatch.countDown
-              }
-            })
-
-            predicateLatch.await(periodMs, TimeUnit.MILLISECONDS)
-
-            if (result) isOk = true
+            isPredicateTrue = checkPredicate($predicate, periodMs)
 
             Thread.sleep(periodMs)
           }
@@ -635,7 +637,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     waitLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
-    isOk
+    isPredicateTrue
   }
 
   def load(location: String): WookieView = load(location, None)
