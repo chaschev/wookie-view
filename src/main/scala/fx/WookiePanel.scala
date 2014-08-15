@@ -1,16 +1,16 @@
 package fx
 
-import javafx.scene.layout.{HBox, Priority, VBox, Pane}
-import javafx.scene.control.{Button, TextArea, TextField}
-import javafx.event.{ActionEvent, EventHandler}
-import javafx.beans.value.{ObservableValue, ChangeListener}
-import javafx.scene.Scene
-import javafx.scene.web.{WebEngine, WebEvent, WebErrorEvent}
-import java.util.Date
-import java.text.SimpleDateFormat
 import java.lang
+import java.text.SimpleDateFormat
+import java.util.Date
+import javafx.beans.value.{ChangeListener, ObservableValue}
+import javafx.event.{ActionEvent, EventHandler}
+import javafx.scene.control.{Button, TextArea, TextField}
 import javafx.scene.input.{KeyCode, KeyEvent}
-import WookiePanel.JS_INVITATION
+import javafx.scene.layout.{HBox, Priority, VBox}
+import javafx.scene.web.{WebEngine, WebErrorEvent}
+
+import fx.WookiePanel.JS_INVITATION
 
 object WookiePanel{
   final val JS_INVITATION = "Enter JavaScript here, i.e.: alert( $('div:last').html() )"
@@ -37,8 +37,8 @@ class WookiePanel(builder:WookiePanelBuilder) extends VBox with WookiePanelField
   val jsButton = new Button("Run JS")
   val go = new Button("Go")
 
-  val wookie:WookieView = builder.wookie
-  val engine:WebEngine = builder.wookie.getEngine
+  val wookie: WookieView = builder.wookie
+  val engine: WebEngine = builder.wookie.getEngine
 
   val goAction = new EventHandler[ActionEvent] {
     def handle(arg0: ActionEvent)

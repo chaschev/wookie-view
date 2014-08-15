@@ -1,0 +1,5 @@
+git.login=Edit login in auth.properties
+git.password=ChangeMe
+
+oracle.login=Edit oracle login in auth.properties
+oracle.password=ChangeMe

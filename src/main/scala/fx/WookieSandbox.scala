@@ -1,17 +1,15 @@
 package fx
 
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{ConcurrentHashMap, CountDownLatch, TimeUnit}
+import javafx.application
 import javafx.application.Application
 import javafx.scene.Scene
-import javafx.scene.layout.Priority
-import javafx.scene.layout.VBox
+import javafx.scene.layout.{Priority, VBox}
 import javafx.stage.Stage
-import org.slf4j.LoggerFactory
-import java.util.concurrent.{TimeUnit, ConcurrentHashMap, CountDownLatch}
-import java.util.concurrent.atomic.AtomicReference
+
 import chaschev.util.Exceptions
-import scala.compat.Platform
-import javafx.application
-import javafx.scene.text.Text
+import org.slf4j.LoggerFactory
 
 class WookieScenario(_url:String, _init:Option[()=>Unit], _panel:()=>WookiePanel, _procedure: (WookiePanel, WookieView, (String)=>JQueryWrapper)=>Unit){
   def newPanel() = _panel.apply()
@@ -48,11 +46,11 @@ object WookieSandboxApp {
       instance.get()
     }
     catch {
-      case e:Exception => throw Exceptions.runtime(e)
+      case e: Exception => throw Exceptions.runtime(e)
     }
   }
   
-  def setMainScenario(ws:WookieScenario) = {
+  def setMainScenario(ws: WookieScenario) = {
     scenarios.put(ws.url, ws)
   }
 }

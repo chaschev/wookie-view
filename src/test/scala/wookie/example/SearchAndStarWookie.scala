@@ -2,14 +2,15 @@ package wookie.example
 
 import fx._
 import fx.WookieScenario
+import java.util.Properties
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
 
 object SearchAndStarWookie {
-  val login = "change login"
-  val password = "change password"
+  var login = ""
+  var password = ""
 
   val defaultPanel = () => {
     val wookieView = WookieView.newBuilder.useJQuery(true).build
@@ -22,6 +23,13 @@ object SearchAndStarWookie {
   def main(args: Array[String])
   {
     val app = WookieSandboxApp.start()
+
+    val props = new Properties()
+
+    props.load(getClass.getResourceAsStream("/auth.properties"))
+
+    login = props.getProperty("git.login")
+    password = props.getProperty("git.password")
 
     app.runOnStage(
       new WookieScenario("http://www.google.com", None,
@@ -49,7 +57,7 @@ object SearchAndStarWookie {
             wookie.waitForLocation(new WaitArg("wookie logged in")
               .matchByLocation(_.contains("/wookie-view"))
               .whenLoaded((e) => {
-              $(".star-button.unstarred:visible").mouseClick()
+              $(".star-button:visible").mouseClick()
             }))
 
             $("#login_field").value(login)
