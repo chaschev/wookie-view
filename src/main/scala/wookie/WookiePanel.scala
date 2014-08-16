@@ -11,6 +11,7 @@ import javafx.scene.layout.{HBox, Priority, VBox}
 import javafx.scene.web.{WebEngine, WebErrorEvent}
 
 import wookie.WookiePanel.JS_INVITATION
+import wookie.view.WookieView
 
 object WookiePanel{
   final val JS_INVITATION = "Enter JavaScript here, i.e.: alert( $('div:last').html() )"

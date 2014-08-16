@@ -1,11 +1,10 @@
 package wookie.example
 
-import wookie._
-import wookie.WookieScenario
 import java.io.File
 import javafx.scene.control.{Label, ProgressBar}
-import javafx.application.Platform
-import scala.util.Random
+
+import wookie._
+import wookie.view.{JQueryWrapper, WaitArg, WookieView}
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -63,9 +62,6 @@ object DownloadJDK {
         (wookiePanel, wookie, $) => {
           $
           val (latestUrl:Option[String], archiveUrl:Option[String]) = getLinksFromVersion
-          
-
-          
         }))
   }
 

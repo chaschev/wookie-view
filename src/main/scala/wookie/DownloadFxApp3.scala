@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
+import wookie.view.{OkNavigationEvent, NavigationEvent, WaitArg, WookieView}
 
 import scala.concurrent.ops._
 import scala.util.Random

@@ -1,4 +1,4 @@
-package wookie
+package wookie.view
 
 import java.lang.{Iterable => JIterable}
 import java.net.URL
@@ -12,352 +12,18 @@ import javafx.scene.layout.Pane
 import javafx.scene.web.{WebEngine, WebEvent, WebView}
 
 import com.google.common.collect.Sets
-import wookie.WookieView.logger
 import netscape.javascript.JSObject
-import org.apache.commons.lang3.{StringEscapeUtils, StringUtils}
+import org.apache.commons.lang3.StringEscapeUtils
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Promise, Future => SFuture}
+import scala.concurrent.{Await, Future => SFuture}
 import scala.util.{Random, Try}
 
 
 case class WookieNavigationEvent(newLoc: String, oldLoc: String, isPageReadyEvent: Boolean)
-
-abstract class NavigationMatcher{
-  def matches(r:NavigationRecord, w:WookieNavigationEvent):Boolean
-}
-
-case class LocationMatcher(url:String) extends NavigationMatcher{
-  override def matches(r:NavigationRecord, w:WookieNavigationEvent): Boolean = {
-    compareURLs(r.arg.location.get, w.newLoc)
-  }
-
-  def compareURLs(_s1: String, _s2: String) = {
-    val s1 =  removeLastSlash(new URL(_s1).toExternalForm)
-    val s2 =  removeLastSlash(new URL(_s2).toExternalForm)
-
-    s1.equals(s2)
-  }
-
-  def removeLastSlash(_s1: String): String =
-  {
-    if (_s1.endsWith("/")) StringUtils.substringBeforeLast(_s1, "/") else _s1
-  }
-}
-
-case class PredicateMatcher(p:((WookieNavigationEvent, WaitArg) => Boolean)) extends NavigationMatcher{
-  override def matches(r: NavigationRecord, w: WookieNavigationEvent): Boolean = {
-    p.apply(w, r.arg)
-  }
-}
-
-object NextPageReadyMatcher{
-  val instance = new NextPageReadyMatcher
-}
-
-case class NextPageReadyMatcher() extends NavigationMatcher{
-  override def matches(r: NavigationRecord, w: WookieNavigationEvent): Boolean = {
-    w.isPageReadyEvent
-  }
-}
-
-class WaitArg(var name: String = ""){
-//  var predicate:Option[((String, String, NavArg) => Boolean)] = None
-  var timeoutMs: Option[Int] = Some(10000)
-  private[this] var handler: Option[(NavigationEvent)=>Unit] = None
-  var async: Boolean = true
-  var isPageReadyEvent:Boolean = true
-
-  val eventId:Int = Random.nextInt()  //currently not really used
-
-  var startedAtMs:Long = -1
-  var location:Option[String] = if(name.equals("")) None else Some(name)
-
-  private[this] var navigationMatcher:NavigationMatcher = NextPageReadyMatcher.instance
-
-  def timeoutNone(): WaitArg = {this.timeoutMs = None; this}
-  def timeoutMs(i:Int): WaitArg = {this.timeoutMs = Some(i); this}
-  def timeoutSec(sec:Int): WaitArg = {this.timeoutMs = Some(sec * 1000);this}
-  def whenLoaded(h:(NavigationEvent) => Unit): WaitArg = {this.handler = Some(h); this}
-  def async(b: Boolean): WaitArg = {this.async = b; this}
-  def withName(n: String): WaitArg = {this.name = n; this}
-
-  def matchByLocation(p: (String) => Boolean):WaitArg = {
-    matchByPredicate((e, arg) => { p.apply(e.newLoc) }); this
-  }
-  def matchIfPageReady(_location:String): WaitArg = {
-    this.navigationMatcher = NextPageReadyMatcher.instance; this
-  }
-
-  def matchOnlyPageReadyEvent(b:Boolean):WaitArg = {this.isPageReadyEvent = b; this}
-
-  def matchByPredicate(p:((WookieNavigationEvent, WaitArg) => Boolean)):WaitArg = {
-    this.navigationMatcher = new PredicateMatcher(p); this
-  }
-
-  def location(_s:String): WaitArg = {this.location = Some(_s); this}
-  def matcher = navigationMatcher
-
-  def isPageReadyEvent(isPageReady: Boolean):WaitArg = {this.isPageReadyEvent = isPageReady; this}
-
-  protected[wookie] def handleIfDefined(e: NavigationEvent) = if(this.handler.isDefined) this.handler.get.apply(e)
-  
-  //todo make package local
-  protected[wookie] def startedAtMs(t: Long): WaitArg = {this.startedAtMs = t; this}
-
-  def isDue =
-    if(timeoutMs.isEmpty) {
-      false
-    } else {
-      startedAtMs + timeoutMs.get < System.currentTimeMillis()
-    }
-
-  def toNavigationRecord:NavigationRecord = {
-    new NavigationRecord(this, Promise[NavigationEvent]())
-  }
-
-  override def toString: String = {
-    if(!name.isEmpty) {
-      s"NavArg{'$name'}"
-    } else
-    if(location.isDefined){
-      s"NavArg{'${location.get}'}"
-    }
-    else {
-      super.toString
-    }
-  }
-
-}
-
-
-class WookieBuilder {
-  var createWebView: Boolean = true
-  var useFirebug: Boolean = false
-  var useJQuery: Boolean = false
-  var includeJsScript: Option[String] = None
-  var includeJsUrls: mutable.MutableList[String] = new mutable.MutableList[String]
-
-  def build: WookieView =
-  {
-    new WookieView(this)
-  }
-
-  def createWebView(b: Boolean): WookieBuilder = { createWebView = b; this }
-  def useJQuery(b: Boolean): WookieBuilder = { useJQuery = b; this }
-  def useFirebug(b: Boolean): WookieBuilder = { useFirebug = b; this }
-  def includeJsScript(s: String): WookieBuilder = { includeJsScript = Some(s); this }
-  def addScriptUrls(s: String): WookieBuilder = { includeJsUrls += s; this }
-}
-
-/**
- * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
- */
-abstract class CompositionJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
-
-}
-
-class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
-  val function = s"newArrayFn($index)"
-}
-
-class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
-//  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
-  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
-  val function = s"newFindFn('$escapedSelector', '$escapedFindSelector')"
-}
-
-class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView) extends CompositionJQueryWrapper("", wookie){
-  val function = "directFn"
-
-  private def assign() = {
-    val engine = wookie.getEngine
-    val window = engine.executeScript("window").asInstanceOf[JSObject]
-
-    if(!isDom){
-      window.setMember("__javaToJS", jsObject)
-    }else{
-      window.setMember("__javaToJS", jsObject)
-
-      engine.executeScript("window.__javaToJS = jQuery(window.__javaToJS); window.__javaToJS")
-    }
-
-
-  }
-
-  override def interact(script: String, timeoutMs: Long): AnyRef = {
-    assign()
-    super.interact(script, timeoutMs)
-  }
-}
-
-class SelectorJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
-  val function = "jQuery"
-}
-
-abstract class JQueryWrapper(selector:String, wookie:WookieView){
-  val function:String
-
-  val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
-
-  def attr(name: String): String = {
-    interact(s"jQueryGetAttr($function, '$escapedSelector', '$name')").asInstanceOf[String]
-  }
-
-  def attrs(): List[String] = {
-    interact(s"jQueryAttrs($function, '$escapedSelector')").asInstanceOf[List[String]]
-  }
-
-  def text(): String = {
-    interact(s"jQuery_text($function, '$escapedSelector', false)".toString).asInstanceOf[String]
-  }
-
-  def html(): String = {
-    interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
-  }
-
-  def clickLink(): JQueryWrapper = {
-    interact(s"clickItem($function, '$escapedSelector')".toString)
-    this
-  }
-
-  def mouseClick(): JQueryWrapper = {
-    triggerEvent("click")
-  }
-
-
-  def triggerEvent(event: String): JQueryWrapper ={
-    interact(s"$function('$escapedSelector').trigger('$event')".toString)
-    this
-  }
-
-  def find(findSelector: String): List[JQueryWrapper] = {
-    val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
-
-    _jsJQueryToResultList(interact(s"jQueryFind($function, '$escapedSelector', '$escapedFindSelector')").asInstanceOf[JSObject])
-  }
-
-  def parent(): List[JQueryWrapper] = {
-    _jsJQueryToResultList(interact(s"$function('$escapedSelector').parent()").asInstanceOf[JSObject])
-  }
-
-
-  def attr(name:String, value:String):JQueryWrapper = {
-    interact(s"jQuerySetAttr($function, '$escapedSelector', '$name', '$value')")
-    this
-  }
-
-  def value(value:String):JQueryWrapper = {
-    interact(s"jQuerySetValue($function, '$escapedSelector').val('$value')")
-    this
-  }
-
-  def submit():JQueryWrapper = {
-    interact(s"submitEnclosingForm($function, '$escapedSelector')")
-    this
-  }
-
-  protected def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] =
-  {
-    var l = r.getMember("length").asInstanceOf[Int]
-
-    val list = new mutable.MutableList[JQueryWrapper]
-
-    println(s"jQuery object, length=$l")
-
-    for (i <- 0 until l) {
-//      list += new ArrayItemJQueryWrapper(selector, i, wookie)
-      val slot = r.getSlot(i)
-
-      println(slot, i)
-
-      val sObject = slot.asInstanceOf[JSObject]
-
-      list += new DirectWrapper(true, sObject, wookie)
-    }
-
-    list.toList
-  }
-
-  protected def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] =
-  {
-    var l = r.getMember("length").asInstanceOf[Int]
-
-    val list = new mutable.MutableList[JQueryWrapper]
-
-    println(s"jQuery object, length=$l")
-
-    for (i <- 0 until l) {
-      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie)
-    }
-
-    list.toList
-  }
-
-  def pressKey(code:Int):JQueryWrapper = {
-    interact(s"pressKey('$escapedSelector', $code)")
-    this
-  }
-
-  def pressEnter():JQueryWrapper = {
-    pressKey(13)
-    this
-  }
-
-  def interact(script: String, timeoutMs: Long = 5000): AnyRef = {
-    WookieView.logger.debug(s"interact: $script")
-
-    val url = wookie.getEngine.getDocument.getDocumentURI
-    val eventId = Random.nextInt()
-
-    val latch = new CountDownLatch(1)
-
-    var r:AnyRef = null
-
-    wookie.includeStuffOnPage(eventId, url, Some(() => {
-      WookieView.logger.debug(s"executing $script")
-      r = wookie.getEngine.executeScript(script)
-      latch.countDown()
-    }))
-
-    r = wookie.getEngine.executeScript(script)
-    latch.countDown()
-
-    val started = System.currentTimeMillis()
-    var expired = false
-
-    while(!expired && !latch.await(1000, TimeUnit.MILLISECONDS) ){
-      if(System.currentTimeMillis() - started > timeoutMs) expired = true
-    }
-
-    if(expired){
-      throw new TimeoutException(s"JS was not executed in ${timeoutMs}ms")
-    }
-
-    WookieView.logger.trace(s"left interact: $script")
-
-    r
-  }
-
-  def html(s: String):JQueryWrapper = {
-    this
-  }
-
-  def append(s:String):JQueryWrapper = {
-    this
-  }
-
-  def asResultList():List[JQueryWrapper] = {
-    val r = interact(s"$function('$escapedSelector')").asInstanceOf[JSObject]
-
-    _jsJQueryToResultList(r)
-  }
-
-  override def toString: String = html()
-}
 
 /**
  * WookieBrowser.
@@ -385,27 +51,7 @@ object WookieView {
   final val logger: Logger = LoggerFactory.getLogger(classOf[WookieView])
 }
 
-abstract class NavigationEvent(waitArg:WaitArg) {
-  val arg = waitArg
-  def ok() : Boolean
 
-
-}
-
-class NokNavigationEvent(waitArg:WaitArg) extends NavigationEvent(waitArg){
-  val ok = false
-}
-
-// redesign: need to provide call back, don't need it outside
-//
-class OkNavigationEvent(_wookieEvent:WookieNavigationEvent, arg:WaitArg) extends NavigationEvent(arg){
-  val ok = true
-  val wookieEvent = _wookieEvent
-}
-
-case class NavigationRecord(arg: WaitArg, promise: Promise[NavigationEvent]){
-
-}
 
 class WookieView(builder: WookieBuilder) extends Pane {
   private val random: Random = new Random
@@ -469,9 +115,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
             //todo: includeStuffOnPage should fix the very old inclusion issue!!
         } else
         if(newState == Worker.State.FAILED || newState == Worker.State.FAILED ){
-          logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
+          WookieView.logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
         } else {
-          logger.debug(s"worker state changed to $newState")
+          WookieView.logger.debug(s"worker state changed to $newState")
         }
       }
     })
@@ -517,7 +163,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
         
         matchingEntries += event
 
-        logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationPredicates.size()}")
+        WookieView.logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationPredicates.size()}")
       }else{
         val eventTypeOk = r.arg.isPageReadyEvent == w.isPageReadyEvent
 
@@ -529,7 +175,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
           matchingEntries += event
 
-          logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
+          WookieView.logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
         }
       }
     }
@@ -686,7 +332,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     initClicksJs(eventId)
 
     // todo is this all a single thread?
-    logger.debug("setting window.__wookiePageInitialized = true;")
+    WookieView.logger.debug("setting window.__wookiePageInitialized = true;")
     getEngine.executeScript("window.__wookiePageInitialized = true;")
 
     // when there are no urls and no scripts, latch is 0

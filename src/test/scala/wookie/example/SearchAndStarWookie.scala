@@ -4,6 +4,8 @@ import wookie._
 import wookie.WookieScenario
 import java.util.Properties
 
+import wookie.view.{WookieView, WaitArg}
+
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */

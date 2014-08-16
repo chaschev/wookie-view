@@ -10,6 +10,7 @@ import javafx.stage.Stage
 
 import chaschev.util.Exceptions
 import org.slf4j.LoggerFactory
+import wookie.view.{NavigationEvent, JQueryWrapper, WookieView}
 
 class WookieScenario(_url:String, _init:Option[()=>Unit], _panel:()=>WookiePanel, _procedure: (WookiePanel, WookieView, (String)=>JQueryWrapper)=>Unit){
   def newPanel() = _panel.apply()
@@ -34,7 +35,7 @@ object WookieSandboxApp {
     Application.launch(classOf[WookieSandboxApp], args: _*)
   }
   
-  def start():WookieSandboxApp = {
+  def start(): WookieSandboxApp = {
     try {
       new Thread(){
         override def run(): Unit = {
@@ -44,8 +45,7 @@ object WookieSandboxApp {
 
       appStartedLatch.await(2, TimeUnit.SECONDS)
       instance.get()
-    }
-    catch {
+    } catch {
       case e: Exception => throw Exceptions.runtime(e)
     }
   }

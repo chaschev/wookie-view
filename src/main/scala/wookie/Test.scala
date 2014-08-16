@@ -1,5 +1,7 @@
 package wookie
 
+import wookie.view.{NavigationEvent, WookieView}
+
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
