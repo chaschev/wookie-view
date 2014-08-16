@@ -1,5 +1,7 @@
 package wookie.view
 
+import java.io.File
+
 import scala.collection.mutable
 
 /**
@@ -11,6 +13,7 @@ class WookieBuilder {
   var useJQuery: Boolean = false
   var includeJsScript: Option[String] = None
   var includeJsUrls: mutable.MutableList[String] = new mutable.MutableList[String]
+  var downloadDir = new File(".")
 
   def build: WookieView =
   {
@@ -22,5 +25,6 @@ class WookieBuilder {
   def useFirebug(b: Boolean): WookieBuilder = { useFirebug = b; this }
   def includeJsScript(s: String): WookieBuilder = { includeJsScript = Some(s); this }
   def addScriptUrls(s: String): WookieBuilder = { includeJsUrls += s; this }
+  def downloadDir(file: File): WookieBuilder = { downloadDir = file; this }
 }
 

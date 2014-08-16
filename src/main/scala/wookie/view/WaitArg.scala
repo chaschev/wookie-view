@@ -27,6 +27,10 @@ class WaitArg(var name: String = ""){
   def async(b: Boolean): WaitArg = {this.async = b; this}
   def withName(n: String): WaitArg = {this.name = n; this}
 
+  def withMatcher(matcher: NavigationMatcher): WaitArg = {
+    navigationMatcher = matcher; this
+  }
+
   def matchByLocation(p: (String) => Boolean):WaitArg = {
     matchByPredicate((e, arg) => { p.apply(e.newLoc) }); this
   }
@@ -34,7 +38,7 @@ class WaitArg(var name: String = ""){
     this.navigationMatcher = NextPageReadyMatcher.instance; this
   }
 
-  def matchOnlyPageReadyEvent(b:Boolean):WaitArg = {this.isPageReadyEvent = b; this}
+  def matchOnlyPageReadyEvent(b: Boolean): WaitArg = {this.isPageReadyEvent = b; this}
 
   def matchByPredicate(p:((WookieNavigationEvent, WaitArg) => Boolean)):WaitArg = {
     this.navigationMatcher = new PredicateMatcher(p); this
@@ -43,7 +47,7 @@ class WaitArg(var name: String = ""){
   def location(_s:String): WaitArg = {this.location = Some(_s); this}
   def matcher = navigationMatcher
 
-  def isPageReadyEvent(isPageReady: Boolean):WaitArg = {this.isPageReadyEvent = isPageReady; this}
+  def isPageReadyEvent(isPageReady: Boolean): WaitArg = {this.isPageReadyEvent = isPageReady; this}
 
   protected[wookie] def handleIfDefined(e: NavigationEvent) = if(this.handler.isDefined) this.handler.get.apply(e)
 

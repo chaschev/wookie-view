@@ -11,8 +11,8 @@ abstract class NavigationMatcher {
   def matches(r:NavigationRecord, w: WookieNavigationEvent):Boolean
 }
 
-case class LocationMatcher(url:String) extends NavigationMatcher{
-  override def matches(r:NavigationRecord, w:WookieNavigationEvent): Boolean = {
+case class LocationMatcher(url: String) extends NavigationMatcher{
+  override def matches(r: NavigationRecord, w: WookieNavigationEvent): Boolean = {
     compareURLs(r.arg.location.get, w.newLoc)
   }
 
@@ -29,7 +29,7 @@ case class LocationMatcher(url:String) extends NavigationMatcher{
   }
 }
 
-case class PredicateMatcher(p:((WookieNavigationEvent, WaitArg) => Boolean)) extends NavigationMatcher{
+case class PredicateMatcher(p: ((WookieNavigationEvent, WaitArg) => Boolean)) extends NavigationMatcher{
   override def matches(r: NavigationRecord, w: WookieNavigationEvent): Boolean = {
     p.apply(w, r.arg)
   }

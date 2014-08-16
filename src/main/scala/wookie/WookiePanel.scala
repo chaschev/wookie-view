@@ -16,7 +16,6 @@ import wookie.view.WookieView
 object WookiePanel{
   final val JS_INVITATION = "Enter JavaScript here, i.e.: alert( $('div:last').html() )"
 
-
   def newBuilder(wookie: WookieView): WookiePanelBuilder = {
     new WookiePanelBuilder(wookie)
   }
@@ -158,10 +157,10 @@ class WookiePanel(builder: WookiePanelBuilder) extends VBox with WookiePanelFiel
 }
 
 trait WookiePanelFields[SELF]{
-  var startAtPage:Option[String] = None
-  var showNavigation:Boolean = true
-  var showDebugPanes:Boolean = true
-  var userPanel:Option[VBox] = None
+  var startAtPage: Option[String] = None
+  var showNavigation: Boolean = true
+  var showDebugPanes: Boolean = true
+  var userPanel: Option[VBox] = None
 
   //todo change SELF to this.type
   def showNavigation(b: Boolean): SELF = { showNavigation = b; self()}
@@ -172,13 +171,8 @@ trait WookiePanelFields[SELF]{
   def self(): SELF
 }
 
-class WookiePanelBuilder(_wookie:WookieView) extends WookiePanelFields[WookiePanelBuilder]{
+class WookiePanelBuilder(val wookie: WookieView) extends WookiePanelFields[WookiePanelBuilder]{
   val self = this
 
-  val wookie = _wookie
-
-  def build: WookiePanel =
-  {
-    new WookiePanel(this)
-  }
+  def build: WookiePanel = new WookiePanel(this)
 }

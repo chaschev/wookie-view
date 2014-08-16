@@ -1,26 +1,14 @@
 package wookie.example
 
-import java.io.{File, FileOutputStream}
+import java.io.File
 import java.util.Properties
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicReference
 import javafx.application.Platform
-import javafx.scene.control.{Label, ProgressBar}
+import javafx.scene.control.Label
 import javafx.scene.layout.VBox
 
-import chaschev.io.FileUtils
-import chaschev.lang.LangUtils
-import chaschev.util.Exceptions
-import com.google.common.io.{ByteStreams, CountingOutputStream}
-import org.apache.commons.io.{FilenameUtils, IOUtils}
-import org.apache.commons.lang3.StringUtils
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
-import wookie.{WookieScenario, WookieSandboxApp, WookiePanel}
 import wookie.view._
-
-import scala.concurrent.ops._
+import wookie.{WookiePanel, WookieSandboxApp, WookieScenario}
 
 case class DownloadResult(file:Option[File], message:String, ok:Boolean){
 
@@ -33,26 +21,13 @@ object DownloadFxApp3 {
   var login = ""
   var password = ""
 
-  var progressLabel: Label = null
-  var progressBar: ProgressBar = null
-
   final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
-
-  final val downloadLatch = new CountDownLatch(1)
-  private final val appStartedLatch = new CountDownLatch(1)
-
-  final val downloadResult = new AtomicReference[DownloadResult]
-
-  //  protected final val instance = new AtomicReference[DownloadFxApp3]
 
   @volatile
   var version: String = "8u11"
 
   @volatile
   var miniMode: Boolean = false
-
-  @volatile
-  var tempDestDir: File = new File(".")
 
   val defaultPanel = () => {
     val wookieView = WookieView.newBuilder
@@ -62,11 +37,8 @@ object DownloadFxApp3 {
       .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
       .build
 
-    progressLabel = new Label("Retrieving a link...")
-    progressBar = new ProgressBar(0)
-
     WookiePanel.newBuilder(wookieView)
-      .userPanel(new VBox(progressLabel, progressBar))
+      .userPanel(new VBox(wookieView.progressLabel, wookieView.progressBar))
       .build
   }
 
@@ -85,7 +57,7 @@ object DownloadFxApp3 {
       new WookieScenario("http://www.google.com", None,
         defaultPanel,
         (wookiePanel, wookie, $) => {
-          val (latestUrl:Option[String], archiveUrl: Option[String]) = findLinksFromVersion
+          val (latestUrl, archiveUrl) = findLinksFromVersion()
 
           //login form state
           wookie.waitForLocation(new WaitArg()
@@ -101,7 +73,15 @@ object DownloadFxApp3 {
             $(".submit_btn").clickLink()
           }))
 
-          whenDownloadStarts(wookie)
+
+          //todo change to location matcher
+          wookie.waitForDownloadToStart(
+            new PredicateMatcher((e, arg) => {
+              val loc = e.newLoc
+
+              loc.contains("download.oracle") && loc.contains("?")
+            })
+          )
 
           // download logic
           // if there is 'the latest version page'
@@ -121,95 +101,6 @@ object DownloadFxApp3 {
 
 
 //"Downloading JDK " + DownloadFxApp3.version + "..."
-
-  private[this] def whenDownloadStarts(wookie: WookieView)
-  {
-    wookie.waitForLocation(new WaitArg()
-      .timeoutNone()
-      // todo: change page ready to ANY?
-      .matchByPredicate((w, arg) => { w.newLoc.contains("download.oracle") && w.newLoc.contains("?")})
-      .isPageReadyEvent(false)
-      .whenLoaded((event) => {
-      // will be here after
-      // clicking accept license and link -> * not logged in * -> here -> download -> redirect to login
-      // download -> fill form -> * logged in * -> here -> download
-      val navEvent = event.asInstanceOf[OkNavigationEvent]
-
-      val uri = navEvent.wookieEvent.newLoc
-
-      spawn {
-        Thread.currentThread().setName("fx-downloader")
-
-        try {
-          //there must be a shorter way to do this
-
-          val httpClient = new DefaultHttpClient
-          val httpget = new HttpGet(uri)
-          val response = httpClient.execute(httpget)
-
-          val code = response.getStatusLine.getStatusCode
-
-          if (code != 200) {
-            System.out.println(IOUtils.toString(response.getEntity.getContent))
-            throw new RuntimeException("failed to download: " + uri)
-          }
-
-          val file = new File(DownloadFxApp3.tempDestDir, StringUtils.substringBefore(FilenameUtils.getName(uri), "?"))
-
-          val httpEntity = response.getEntity
-          val length = httpEntity.getContentLength
-
-          val os = new CountingOutputStream(new FileOutputStream(file))
-
-          println(s"Downloading $uri to $file...")
-
-          var lastProgress = 0.0
-          var isProgressRunning = true
-
-          spawn {
-            Thread.currentThread().setName("progressThread")
-
-            while (isProgressRunning) {
-              val bytesCopied = os.getCount
-              val progress = bytesCopied * 100D / length
-
-              if (progress != lastProgress) {
-                val s = s"${file.getName}: ${FileUtils.humanReadableByteCount(bytesCopied, false, false)}/${FileUtils.humanReadableByteCount(length, false, true)} ${LangUtils.toConciseString(progress, 1)}%"
-
-                setStatus(progressLabel, s)
-
-                print("\r" + s)
-              }
-
-              lastProgress = progress
-              progressBar.setProgress(bytesCopied * 1D / length)
-
-              try {
-                Thread.sleep(500)
-              }
-              catch {
-                case e: InterruptedException => //ignore
-              }
-            }
-          }
-
-          ByteStreams.copy(httpEntity.getContent, os)
-
-          isProgressRunning = false
-
-          System.out.println("Download complete.")
-          DownloadFxApp3.downloadResult.set(new DownloadResult(Some(file), "", true))
-          DownloadFxApp3.downloadLatch.countDown
-        }
-        catch {
-          case e: Exception =>
-            LoggerFactory.getLogger("log").warn("", e)
-            DownloadFxApp3.downloadResult.set(new DownloadResult(None, e.getMessage, false))
-            throw Exceptions.runtime(e)
-        }
-      }
-    }))
-  }
 
   def findLinksFromVersion(): (Option[String], Option[String]) = {
     val archiveLinksMap = Map(
@@ -253,9 +144,8 @@ object DownloadFxApp3 {
         if (found) {
           logger.info("found a link, will be redirected to the login page...")
         } else {
-          DownloadFxApp3.downloadResult.set(new DownloadResult(None, "didn't find a link", false))
-
-          DownloadFxApp3.downloadLatch.countDown()
+          //todo fixme complete download promise
+//          downloadPromise.complete(Try(new DownloadResult(None, "didn't find a link", false)))
         }
       })
     } else {
