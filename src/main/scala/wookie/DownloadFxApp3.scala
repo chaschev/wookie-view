@@ -18,10 +18,10 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
-import wookie.view.{OkNavigationEvent, NavigationEvent, WaitArg, WookieView}
+import wookie.DownloadFxApp3.{oraclePassword, oracleUser, logger}
+import wookie.view._
 
 import scala.concurrent.ops._
-import scala.util.Random
 
 object DownloadFxApp3{
   final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
@@ -54,8 +54,8 @@ object DownloadFxApp3{
   {
 
     DownloadFxApp3.version = "6u45"
-    DownloadFxApp3.oracleUser = Some("chaschev@gmail.com")
-    DownloadFxApp3.oraclePassword = Some("Shotgun8!")
+    oracleUser = Some("chaschev@gmail.com")
+    oraclePassword = Some("Shotgun8!")
 
     Application.launch(classOf[DownloadFxApp3], args: _*)
   }
@@ -90,14 +90,29 @@ class DownloadFxApp3 extends Application{
         .build
 
       DownloadFxApp3.instance.set(this)
-      DownloadFxApp3.appStartedLatch.countDown
+      DownloadFxApp3.appStartedLatch.countDown()
 
       createAndShowStage(stage)
 
-      val (latestUrl:Option[String], archiveUrl:Option[String]) = getLinksFromVersion
+      val (latestUrl:Option[String], archiveUrl:Option[String]) = findLinksFromVersion
 
-      whenSignonForm
-      whenDownloadStarts
+      //login form state
+      browser.waitForLocation(new WaitArg()
+        .timeoutNone()
+        .matchByLocation(_.contains("signon.jsp"))
+        .whenLoaded((e) => {
+
+        val $ = browser.$ _
+
+        logger.info(s"signon form: ${$("#sso_username")}")
+
+        $("#sso_username").value(oracleUser.get)
+        $("#ssopassword").value(oraclePassword.get)
+
+        $(".submit_btn").clickLink()
+      }))
+
+      whenDownloadStarts()
 
       // download logic
       // if there is 'the latest version page'
@@ -233,38 +248,7 @@ class DownloadFxApp3 extends Application{
     }))
   }
 
-  protected def whenSignonForm() =
-  {
-    browser.waitForLocation(new WaitArg()
-      .timeoutNone()
-      .matchByPredicate((w, arg) => {w.newLoc.contains("signon.jsp")})
-      .whenLoaded((event) => {
-//      setStatus(progressLabel, "waiting for the login form...")
-//
-//      Thread.sleep(1000)
-//
-//      browser.waitFor("$('#sso_username').length > 0", 10000)
-
-      println(browser.$("#sso_username"))
-
-      System.out.println("I see it all, I see it now!")
-
-      Platform.runLater(new Runnable {
-        def run()
-        {
-          browser.initClicksJs(Random.nextInt())
-          browser.getEngine.executeScript("" +
-            "alert($('#sso_username').val('" + DownloadFxApp3.oracleUser.get + "'));\n" +
-            "alert($('#ssopassword').val('" + DownloadFxApp3.oraclePassword.get + "'));\n" +
-            "$clickIt($('.sf-btnarea a'))"
-          )
-        }
-      })
-    }))
-  }
-
-  def getLinksFromVersion:(Option[String], Option[String]) =
-  {
+  def findLinksFromVersion(): (Option[String], Option[String]) = {
     val archiveLinksMap = Map(
       5 -> "http://www.oracle.com/technetwork/java/javasebusiness/downloads/java-archive-downloads-javase5-419410.html",
       6 -> "http://www.oracle.com/technetwork/java/javase/downloads/java-archive-downloads-javase6-419409.html",
@@ -298,16 +282,15 @@ class DownloadFxApp3 extends Application{
     })
   }
 
-  protected def tryArchivePage(found: Boolean, archiveUrl: Option[String], browser: WookieView)
-  {
+  protected def tryArchivePage(found: Boolean, archiveUrl: Option[String], browser: WookieView) = {
     if (!found && archiveUrl.isDefined) {
       tryFindVersionAtPage(browser, archiveUrl.get, (found) => {
         if (found) {
-          println("Will be redirected to login page...")
+          logger.info("found a link, will be redirected to the login page...")
         } else {
           DownloadFxApp3.downloadResult.set(new DownloadResult(None, "didn't find a link", false))
 
-          DownloadFxApp3.downloadLatch.countDown
+          DownloadFxApp3.downloadLatch.countDown()
         }
       })
     } else {
@@ -321,11 +304,11 @@ class DownloadFxApp3 extends Application{
    * @param archiveUrl
    * @param whenDone(found Boolean)
    */
-  private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit)
+  private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit) =
   {
     browser.load(archiveUrl, (event:NavigationEvent) => {
         try {
-          val aBoolean: Boolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadFxApp3.version + "', true, 'linux');").asInstanceOf[Boolean]
+          val aBoolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadFxApp3.version + "', true, 'linux');").asInstanceOf[Boolean]
 
           if (aBoolean) {
             whenDone.apply(true)

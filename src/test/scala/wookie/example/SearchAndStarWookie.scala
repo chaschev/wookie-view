@@ -9,7 +9,6 @@ import wookie.view.{WookieView, WaitArg}
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
-
 object SearchAndStarWookie {
   var login = ""
   var password = ""
