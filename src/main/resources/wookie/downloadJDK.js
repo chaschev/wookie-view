@@ -51,7 +51,7 @@ var downloadIfFound = function(version, x64, platform){
 
     if($a){
         try{
-        clickIt($a);
+            clickIt($a);
         }catch(e){
             alert("error: " + e)
         }
@@ -61,5 +61,5 @@ var downloadIfFound = function(version, x64, platform){
     alert("download has: " + $a);
 
     return false;
-}
+};
 

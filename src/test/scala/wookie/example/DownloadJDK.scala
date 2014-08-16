@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory
 import wookie.view._
 import wookie.{WookiePanel, WookieSandboxApp, WookieScenario}
 
+import scala.concurrent.ExecutionContext
+
 case class DownloadResult(file:Option[File], message:String, ok:Boolean){
 
 }
@@ -18,6 +20,8 @@ case class DownloadResult(file:Option[File], message:String, ok:Boolean){
  * @author Andrey Chaschev chaschev@gmail.com
  */
 object DownloadFxApp3 {
+  import ExecutionContext.Implicits.global
+
   var login = ""
   var password = ""
 
@@ -28,6 +32,7 @@ object DownloadFxApp3 {
 
   @volatile
   var miniMode: Boolean = false
+
 
   val defaultPanel = () => {
     val wookieView = WookieView.newBuilder
@@ -59,7 +64,6 @@ object DownloadFxApp3 {
         "http://www.google.com", None,
         defaultPanel,
         (wookiePanel, wookie, $) => {
-          val (latestUrl, archiveUrl) = findLinksFromVersion()
 
           //login form state
           wookie.waitForLocation(new WaitArg()
@@ -79,10 +83,15 @@ object DownloadFxApp3 {
             new LocationMatcher(loc =>
               loc.contains("download.oracle") && loc.contains("?")
             )
-          )
+          ).andThen({ case result =>
+            logger.info(s"download done: $result")
+          })
 
           // download logic
-          // if there is 'the latest version page'
+          // first try the latest version page, which does not require oracle login
+          // then try archives page for the JDK version given
+          val (latestUrl, archiveUrl) = findLinksFromVersion()
+
           if (latestUrl.isDefined) {
             tryFindVersionAtPage(wookie, latestUrl.get, (found:Boolean) => {
               if(!found){
