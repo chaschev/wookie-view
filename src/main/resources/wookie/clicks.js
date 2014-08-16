@@ -124,8 +124,8 @@ var jQueryAttrs = function(operationFn, $sel){
     var nodes=[], values=[];
     var el =  r[0];
 
-    for (var attr, i=0, attrs=el.attributes, l=attrs.length; i<l; i++){
-        attr = attrs.item(i)
+    for (var attr, i = 0, attrs=el.attributes, l=attrs.length; i<l; i++){
+        attr = attrs.item(i);
         nodes.push(attr.nodeName);
         values.push(attr.nodeValue);
     }

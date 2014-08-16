@@ -38,11 +38,14 @@ object SearchAndStarWookie {
         "http://www.google.com", None,
         defaultPanel,
         (wookiePanel, wookie, $) => {
+
+          // google search result state
           wookie.waitForLocation(new WaitArg("google search results")
             .matchByLocation(_.contains("q="))
             .whenLoaded((e) => {
             println("results: " + $("h3.r").asResultList())
 
+            //find our link in the results list and click it
             val githubLink = $("h3.r a").asResultList().find(_.text().contains("chaschev"))
 
             githubLink.get.clickLink()
@@ -50,18 +53,24 @@ object SearchAndStarWookie {
 
           // this matcher is the same as one of the following
           // there is no problem, because matchers are removed when they are hit
+          // waits for wookie-view page to load and clicks signin button
           wookie.waitForLocation(new WaitArg("git wookie not logged in")
             .matchByLocation(_.contains("/wookie-view"))
             .whenLoaded((e) => { $("a.button.signin").clickLink() })
           )
 
+          // login form
           wookie.waitForLocation(new WaitArg("git login")
             .matchByLocation(_.contains("github.com/login"))
             .whenLoaded((e) => {
 
+              // github.com/wookie-view, logged in state
+              // add this state before submitting the form
               wookie.waitForLocation(new WaitArg("wookie logged in")
                 .matchByLocation(_.contains("/wookie-view"))
                 .whenLoaded((e) => {
+
+                  //click 'star' button
                   val starButton = $(".star-button:visible")
 
                   if(starButton.text().contains("Star")) {
@@ -69,11 +78,13 @@ object SearchAndStarWookie {
                   }
               }))
 
+              // fill login data and submit the form
               $("#login_field").value(login)
               $("#password").value(password)
                 .submit()
           }))
 
+          // submit google request
           $("input[maxlength]")
             .value("wookie-view")
             .submit()

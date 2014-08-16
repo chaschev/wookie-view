@@ -12,20 +12,20 @@ import wookie.{WookiePanel, WookieSandboxApp, WookieScenario}
 
 import scala.concurrent.ExecutionContext
 
-case class DownloadResult(file:Option[File], message:String, ok:Boolean){
+case class DownloadResult(file:Option[File], message: String, ok:Boolean){
 
 }
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
-object DownloadFxApp3 {
+object DownloadJDK {
   import ExecutionContext.Implicits.global
 
   var login = ""
   var password = ""
 
-  final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
+  final val logger = LoggerFactory.getLogger(DownloadJDK.getClass)
 
   @volatile
   var version: String = "8u11"
@@ -34,11 +34,13 @@ object DownloadFxApp3 {
   var miniMode: Boolean = false
 
 
-  val defaultPanel = () => {
+  // current design assumes multiple downloaders are possible
+  // this closure is used to create a single download panel
+  val defaultPanelCreator = () => {
     val wookieView = WookieView.newBuilder
       .useFirebug(false)
       .useJQuery(true)
-      .createWebView(!DownloadFxApp3.miniMode)
+      .createWebView(!DownloadJDK.miniMode)
       .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
       .build
 
@@ -60,12 +62,12 @@ object DownloadFxApp3 {
 
     app.runOnStage(
       new WookieScenario(
-        "Downloading JDK " + DownloadFxApp3.version,
+        "Downloading JDK " + DownloadJDK.version,
         "http://www.google.com", None,
-        defaultPanel,
+        defaultPanelCreator,
         (wookiePanel, wookie, $) => {
 
-          //login form state
+          //this is login form state
           wookie.waitForLocation(new WaitArg()
             .timeoutNone()
             .matchByLocation(_.contains("signon.jsp"))
@@ -79,6 +81,7 @@ object DownloadFxApp3 {
             $(".submit_btn").clickLink()
           }))
 
+          // this is download detection by an url
           wookie.waitForDownloadToStart(
             new LocationMatcher(loc =>
               loc.contains("download.oracle") && loc.contains("?")
@@ -122,7 +125,7 @@ object DownloadFxApp3 {
     var archiveUrl: Option[String] = None
     var latestUrl: Option[String] = None
 
-    val ch = DownloadFxApp3.version.charAt(0)
+    val ch = DownloadJDK.version.charAt(0)
 
     if (List('8', '7', '6', '5').contains(ch)) {
       latestUrl = latestLinksMap.get(ch - '0')
@@ -157,17 +160,11 @@ object DownloadFxApp3 {
     }
   }
 
-  /**
-   *
-   * @param browser
-   * @param archiveUrl
-   * @param whenDone(found Boolean)
-   */
   private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit) =
   {
     browser.load(archiveUrl, (event:NavigationEvent) => {
         try {
-          val aBoolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadFxApp3.version + "', true, 'linux');").asInstanceOf[Boolean]
+          val aBoolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadJDK.version + "', true, 'linux');").asInstanceOf[Boolean]
 
           if (aBoolean) {
             whenDone.apply(true)
