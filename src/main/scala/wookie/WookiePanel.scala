@@ -17,7 +17,7 @@ object WookiePanel{
   final val JS_INVITATION = "Enter JavaScript here, i.e.: alert( $('div:last').html() )"
 
 
-  def newBuilder(wookie:WookieView):WookiePanelBuilder = {
+  def newBuilder(wookie: WookieView): WookiePanelBuilder = {
     new WookiePanelBuilder(wookie)
   }
 }
@@ -25,7 +25,7 @@ object WookiePanel{
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
-class WookiePanel(builder:WookiePanelBuilder) extends VBox with WookiePanelFields[WookiePanel]{
+class WookiePanel(builder: WookiePanelBuilder) extends VBox with WookiePanelFields[WookiePanel]{
   val self = this
 
   val location = new TextField(builder.startAtPage.getOrElse(""))
@@ -99,6 +99,7 @@ class WookiePanel(builder:WookiePanelBuilder) extends VBox with WookiePanelField
 
     go.setOnAction(goAction)
 
+
     if (builder.showDebugPanes) {
 //      val engine:WebEngine = builder.wookie.getEngine
 
@@ -129,6 +130,10 @@ class WookiePanel(builder:WookiePanelBuilder) extends VBox with WookiePanelField
 
     if(builder.showDebugPanes) vBox.getChildren.add(jsArea)
 
+    if(builder.userPanel.isDefined) {
+      vBox.getChildren.add(builder.userPanel.get)
+    }
+
     vBox.getChildren.add(builder.wookie)
 
     if(builder.showNavigation) vBox.getChildren.add(logArea)
@@ -156,12 +161,15 @@ trait WookiePanelFields[SELF]{
   var startAtPage:Option[String] = None
   var showNavigation:Boolean = true
   var showDebugPanes:Boolean = true
+  var userPanel:Option[VBox] = None
 
+  //todo change SELF to this.type
   def showNavigation(b: Boolean): SELF = { showNavigation = b; self()}
   def showDebugPanes(b: Boolean): SELF = { showDebugPanes = b; self()}
   def startAtPage(url:String): SELF = { startAtPage = Some(url); self()}
+  def userPanel(vbox: VBox): SELF = { userPanel = Some(vbox); self()}
 
-  def self():SELF
+  def self(): SELF
 }
 
 class WookiePanelBuilder(_wookie:WookieView) extends WookiePanelFields[WookiePanelBuilder]{
