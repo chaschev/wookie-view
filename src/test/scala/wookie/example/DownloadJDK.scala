@@ -1,7 +1,7 @@
 package wookie.example
 
-import fx._
-import fx.WookieScenario
+import wookie._
+import wookie.WookieScenario
 import java.io.File
 import javafx.scene.control.{Label, ProgressBar}
 import javafx.application.Platform

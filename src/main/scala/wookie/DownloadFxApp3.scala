@@ -1,27 +1,26 @@
-package fx
+package wookie
 
-import javafx.application.{Platform, Application}
-import javafx.scene.control.{Label, ProgressBar}
-import javafx.scene.layout.{Priority, VBox}
-import javafx.scene.Scene
-import chaschev.util.Exceptions
-import org.apache.http.impl.client.DefaultHttpClient
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.{HttpEntity, HttpResponse}
-import org.apache.commons.io.{FilenameUtils, IOUtils}
-import java.io.{FileOutputStream, File}
-import org.apache.commons.lang3.StringUtils
-import com.google.common.io.{ByteStreams, CountingOutputStream}
-import chaschev.io.FileUtils
-import chaschev.lang.LangUtils
-import org.slf4j.LoggerFactory
-import javafx.stage.Stage
+import java.io.{File, FileOutputStream}
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
-import javafx.beans.value.{ObservableValue, ChangeListener}
-import scala.util.Random
+import javafx.application.{Application, Platform}
+import javafx.scene.Scene
+import javafx.scene.control.{Label, ProgressBar}
+import javafx.scene.layout.{Priority, VBox}
+import javafx.stage.Stage
+
+import chaschev.io.FileUtils
+import chaschev.lang.LangUtils
+import chaschev.util.Exceptions
+import com.google.common.io.{ByteStreams, CountingOutputStream}
+import org.apache.commons.io.{FilenameUtils, IOUtils}
+import org.apache.commons.lang3.StringUtils
+import org.apache.http.client.methods.HttpGet
+import org.apache.http.impl.client.DefaultHttpClient
+import org.slf4j.LoggerFactory
+
 import scala.concurrent.ops._
-import scala.concurrent.ExecutionContext
+import scala.util.Random
 
 object DownloadFxApp3{
   final val logger = LoggerFactory.getLogger(DownloadFxApp3.getClass)
@@ -86,7 +85,7 @@ class DownloadFxApp3 extends Application{
         .useFirebug(false)
         .useJQuery(true)
         .createWebView(!DownloadFxApp3.miniMode)
-        .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/fx/downloadJDK.js")).mkString)
+        .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
         .build
 
       DownloadFxApp3.instance.set(this)
@@ -139,12 +138,12 @@ class DownloadFxApp3 extends Application{
       stage.setHeight(768)
     }
 
-    stage.show
+    stage.show()
 
     VBox.setVgrow(browser, Priority.ALWAYS)
   }
 
-  def whenDownloadStarts()
+  private[this] def whenDownloadStarts()
   {
     browser.waitForLocation(new WaitArg()
       .timeoutNone()
@@ -233,7 +232,7 @@ class DownloadFxApp3 extends Application{
     }))
   }
 
-  protected def whenSignonForm
+  protected def whenSignonForm() =
   {
     browser.waitForLocation(new WaitArg()
       .timeoutNone()
@@ -321,7 +320,7 @@ class DownloadFxApp3 extends Application{
    * @param archiveUrl
    * @param whenDone(found Boolean)
    */
-  private[fx] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit)
+  private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit)
   {
     browser.load(archiveUrl, (event:NavigationEvent) => {
         try {

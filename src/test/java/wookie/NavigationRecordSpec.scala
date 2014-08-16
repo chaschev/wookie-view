@@ -1,4 +1,4 @@
-package fx
+package wookie
 
 import org.scalatest.{FlatSpec, Matchers}
 

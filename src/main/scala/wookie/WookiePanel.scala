@@ -1,4 +1,4 @@
-package fx
+package wookie
 
 import java.lang
 import java.text.SimpleDateFormat
@@ -10,7 +10,7 @@ import javafx.scene.input.{KeyCode, KeyEvent}
 import javafx.scene.layout.{HBox, Priority, VBox}
 import javafx.scene.web.{WebEngine, WebErrorEvent}
 
-import fx.WookiePanel.JS_INVITATION
+import wookie.WookiePanel.JS_INVITATION
 
 object WookiePanel{
   final val JS_INVITATION = "Enter JavaScript here, i.e.: alert( $('div:last').html() )"

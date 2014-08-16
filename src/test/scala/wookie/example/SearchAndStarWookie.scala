@@ -1,7 +1,7 @@
 package wookie.example
 
-import fx._
-import fx.WookieScenario
+import wookie._
+import wookie.WookieScenario
 import java.util.Properties
 
 /**
@@ -45,6 +45,8 @@ object SearchAndStarWookie {
             githubLink.get.clickLink()
           }))
 
+          // this matcher is the same as one of the following
+          // there is no problem, because matchers are removed when they are hit
           wookie.waitForLocation(new WaitArg("git wookie not logged in")
             .matchByLocation(_.contains("/wookie-view"))
             .whenLoaded((e) => { $("a.button.signin").clickLink() })
@@ -54,15 +56,19 @@ object SearchAndStarWookie {
             .matchByLocation(_.contains("github.com/login"))
             .whenLoaded((e) => {
 
-            wookie.waitForLocation(new WaitArg("wookie logged in")
-              .matchByLocation(_.contains("/wookie-view"))
-              .whenLoaded((e) => {
-              $(".star-button:visible").mouseClick()
-            }))
+              wookie.waitForLocation(new WaitArg("wookie logged in")
+                .matchByLocation(_.contains("/wookie-view"))
+                .whenLoaded((e) => {
+                  val starButton = $(".star-button:visible")
 
-            $("#login_field").value(login)
-            $("#password").value(password)
-              .submit()
+                  if(starButton.text().contains("Star")) {
+                    starButton.mouseClick()
+                  }
+              }))
+
+              $("#login_field").value(login)
+              $("#password").value(password)
+                .submit()
           }))
 
           $("input[maxlength]")
