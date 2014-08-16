@@ -12,12 +12,13 @@ import chaschev.util.Exceptions
 import org.slf4j.LoggerFactory
 import wookie.view.{NavigationEvent, JQueryWrapper, WookieView}
 
-class WookieScenario(_url:String, _init:Option[()=>Unit], _panel:()=>WookiePanel, _procedure: (WookiePanel, WookieView, (String)=>JQueryWrapper)=>Unit){
-  def newPanel() = _panel.apply()
-
-  val url = _url
-  val init = _init
-  val procedure = _procedure
+class WookieScenario(
+                     val title: String,
+                     val url: String,
+                     val init:Option[()=>Unit],
+                     val panel: () => WookiePanel,
+                     val procedure: (WookiePanel, WookieView, (String) => JQueryWrapper) => Unit){
+  def newPanel(): WookiePanel = panel()
 }
 
 object WookieSandboxApp {
@@ -79,12 +80,16 @@ class WookieSandboxApp extends Application {
 //    new WookiePanel(stage, )
   }
 
-  def runOnStage(ws:WookieScenario) = {
+  def runOnStage(ws: WookieScenario) = {
     application.Platform.runLater(new Runnable {
       override def run(): Unit = {
         val panel = ws.newPanel()
 
-        new WookieStage(new Stage(), panel).show()
+        val stage = new Stage()
+
+        stage.setTitle(ws.title)
+
+        new WookieStage(stage, panel).show()
 
         if(ws.init.isDefined) ws.init.get.apply()
 

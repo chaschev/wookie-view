@@ -54,7 +54,9 @@ object DownloadFxApp3 {
     password = props.getProperty("oracle.password")
 
     app.runOnStage(
-      new WookieScenario("http://www.google.com", None,
+      new WookieScenario(
+        "Downloading JDK " + DownloadFxApp3.version,
+        "http://www.google.com", None,
         defaultPanel,
         (wookiePanel, wookie, $) => {
           val (latestUrl, archiveUrl) = findLinksFromVersion()
@@ -73,14 +75,10 @@ object DownloadFxApp3 {
             $(".submit_btn").clickLink()
           }))
 
-
-          //todo change to location matcher
           wookie.waitForDownloadToStart(
-            new PredicateMatcher((e, arg) => {
-              val loc = e.newLoc
-
+            new LocationMatcher(loc =>
               loc.contains("download.oracle") && loc.contains("?")
-            })
+            )
           )
 
           // download logic
@@ -98,9 +96,6 @@ object DownloadFxApp3 {
           }
         }))
   }
-
-
-//"Downloading JDK " + DownloadFxApp3.version + "..."
 
   def findLinksFromVersion(): (Option[String], Option[String]) = {
     val archiveLinksMap = Map(

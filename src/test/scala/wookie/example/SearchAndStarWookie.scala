@@ -33,7 +33,9 @@ object SearchAndStarWookie {
     password = props.getProperty("git.password")
 
     app.runOnStage(
-      new WookieScenario("http://www.google.com", None,
+      new WookieScenario(
+        "Star Wookie!",
+        "http://www.google.com", None,
         defaultPanel,
         (wookiePanel, wookie, $) => {
           wookie.waitForLocation(new WaitArg("google search results")

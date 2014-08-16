@@ -31,9 +31,9 @@ class WaitArg(var name: String = ""){
     navigationMatcher = matcher; this
   }
 
-  def matchByLocation(p: (String) => Boolean):WaitArg = {
-    matchByPredicate((e, arg) => { p.apply(e.newLoc) }); this
-  }
+  def matchByLocation(p: (String) => Boolean): WaitArg =
+    withMatcher(new LocationMatcher(p))
+
   def matchIfPageReady(_location:String): WaitArg = {
     this.navigationMatcher = NextPageReadyMatcher.instance; this
   }

@@ -24,6 +24,7 @@ import org.apache.commons.lang3.{StringEscapeUtils, StringUtils}
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
+import wookie.view.WookieView.logger
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
@@ -125,14 +126,14 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
           //todo: get oldLoc from history
 
-          WookieView.logger.info(s"page ready: $currentLocation")
+          logger.info(s"page ready: $currentLocation")
           
           includeStuffOnPage(random.nextInt(), currentLocation, Some(() => {
-            WookieView.logger.info(s"stuff loaded: $currentLocation")
+            logger.info(s"stuff loaded: $currentLocation")
 
             val handlers = scanHandlers(new WookieNavigationEvent(currentLocation, "", true))
 
-            WookieView.logger.debug(s"stateProperty (pageReady): found ${handlers.size} handlers, processing....")
+            logger.debug(s"stateProperty (pageReady): found ${handlers.size} handlers, processing....")
 
             handlers.foreach(event => {
                 event.arg.handleIfDefined(event)
@@ -142,9 +143,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
             //todo: includeStuffOnPage should fix the very old inclusion issue!!
         } else
         if(newState == Worker.State.FAILED || newState == Worker.State.FAILED ){
-          WookieView.logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
+          logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
         } else {
-          WookieView.logger.debug(s"worker state changed to $newState")
+          logger.debug(s"worker state changed to $newState")
         }
       }
     })
@@ -152,7 +153,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     webEngine.locationProperty().addListener(new ChangeListener[String] {
       def changed(observableValue: ObservableValue[_ <: String], oldLoc: String, newLoc: String)
       {
-        WookieView.logger.info(s"location changed to $newLoc")
+        logger.info(s"location changed to $newLoc")
 
         history += newLoc
         
@@ -245,7 +246,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
           isProgressRunning = false
 
-          WookieView.logger.info("download complete")
+          logger.info("download complete")
 
           downloadPromise.complete(Try(new DownloadResult(Some(file), "", true)))
         }
@@ -290,7 +291,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
         
         matchingEntries += event
 
-        WookieView.logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationPredicates.size()}")
+        logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationPredicates.size()}")
       }else{
         val eventTypeOk = r.arg.isPageReadyEvent == w.isPageReadyEvent
 
@@ -302,7 +303,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
           matchingEntries += event
 
-          WookieView.logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
+          logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
         }
       }
     }
@@ -316,7 +317,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   private[wookie] def jsReady(eventId: Int, from: String)
   {
-    WookieView.logger.info(s"event $eventId arrived from $from")
+    logger.info(s"event $eventId arrived from $from")
 
     val jsHandler = jsHandlers.get(eventId)
 
@@ -332,7 +333,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       }
     }
 
-    WookieView.logger.debug(s"leaving from jsReady, eventId: $eventId")
+    logger.debug(s"leaving from jsReady, eventId: $eventId")
   }
 
 
@@ -379,7 +380,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
    */
   def load(location: String, arg: WaitArg): WookieView =
   {
-    WookieView.logger.info("navigating to {}", location)
+    logger.info("navigating to {}", location)
 
     //todo test non-canonical urls
 
@@ -402,17 +403,17 @@ class WookieView(builder: WookieBuilder) extends Pane {
     try {
       val s = webEngine.executeScript(s"'' + window.__wookiePageInitialized").asInstanceOf[String]
       if (s == "true") {
-        WookieView.logger.debug(s"wookie page $location already initialized")
+        logger.debug(s"wookie page $location already initialized")
 
         if (onLoad.isDefined) onLoad.get.apply()
 
         return SFuture.successful(true)
       }
     } catch {
-      case e: Exception => WookieView.logger.debug("exception", e)
+      case e: Exception => logger.debug("exception", e)
     }
 
-    WookieView.logger.info(s"initializing $location")
+    logger.info(s"initializing $location")
 
     val urls = mutable.MutableList(options.includeJsUrls: _*)
 
@@ -437,7 +438,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }
 
     if (onLoad.isDefined) {
-      WookieView.logger.info(s"registered event: $eventId for location $location")
+      logger.info(s"registered event: $eventId for location $location")
 
       jsHandlers.put(eventId, handler)
     }
@@ -459,7 +460,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     initClicksJs(eventId)
 
     // todo is this all a single thread?
-    WookieView.logger.debug("setting window.__wookiePageInitialized = true;")
+    logger.debug("setting window.__wookiePageInitialized = true;")
     getEngine.executeScript("window.__wookiePageInitialized = true;")
 
     // when there are no urls and no scripts, latch is 0
