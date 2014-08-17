@@ -14,8 +14,8 @@ import wookie.view.{NavigationEvent, JQueryWrapper, WookieView}
 
 class WookieScenario(
                      val title: String,
-                     val url: String,
-                     val init:Option[()=>Unit],
+                     val url: Option[String] = None,
+//                     val init: Option[()=>Unit] = None,
                      val panel: () => WookiePanel,
                      val procedure: (WookiePanel, WookieView, (String) => JQueryWrapper) => Unit){
   def newPanel(): WookiePanel = panel()
@@ -52,7 +52,7 @@ object WookieSandboxApp {
   }
   
   def setMainScenario(ws: WookieScenario) = {
-    scenarios.put(ws.url, ws)
+    scenarios.put(ws.title, ws)
   }
 }
 
@@ -91,13 +91,17 @@ class WookieSandboxApp extends Application {
 
         new WookieStage(stage, panel).show()
 
-        if(ws.init.isDefined) ws.init.get.apply()
+//        if(ws.init.isDefined) ws.init.get.apply()
 
         val wookie = panel.wookie
 
-        wookie.load(ws.url, (e:NavigationEvent) => {
-          ws.procedure.apply(panel, wookie, (s) => wookie.$(s))
-        })
+        if(ws.url.isDefined) {
+          wookie.load(ws.url.get, (e: NavigationEvent) => {
+            ws.procedure(panel, wookie, (s) => wookie.$(s))
+          })
+        } else {
+          ws.procedure(panel, wookie, (s) => wookie.$(s))
+        }
       }
     })
   }

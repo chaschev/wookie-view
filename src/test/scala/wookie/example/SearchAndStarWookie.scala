@@ -34,10 +34,10 @@ object SearchAndStarWookie {
 
     app.runOnStage(
       new WookieScenario(
-        "Star Wookie!",
-        "http://www.google.com", None,
-        defaultPanel,
-        (wookiePanel, wookie, $) => {
+        url = Some("http://www.google.com"),
+        title = "Star Wookie Page!",
+        panel = defaultPanel,
+        procedure = (wookiePanel, wookie, $) => {
 
           // google search result state
           wookie.waitForLocation(new WaitArg("google search results")

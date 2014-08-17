@@ -44,7 +44,7 @@ class WaitArg(var name: String = ""){
     this.navigationMatcher = new PredicateMatcher(p); this
   }
 
-  def location(_s:String): WaitArg = {this.location = Some(_s); this}
+  def location(_s: String): WaitArg = {this.location = Some(_s); this}
   def matcher = navigationMatcher
 
   def isPageReadyEvent(isPageReady: Boolean): WaitArg = {this.isPageReadyEvent = isPageReady; this}

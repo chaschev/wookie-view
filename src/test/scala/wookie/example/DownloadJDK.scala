@@ -62,10 +62,10 @@ object DownloadJDK {
 
     app.runOnStage(
       new WookieScenario(
-        "Downloading JDK " + DownloadJDK.version,
-        "http://www.google.com", None,
-        defaultPanelCreator,
-        (wookiePanel, wookie, $) => {
+        url = Some("http://www.google.com"),
+        title = "Downloading JDK " + DownloadJDK.version,
+        panel = defaultPanelCreator,
+        procedure = (wookiePanel, wookie, $) => {
 
           //this is login form state
           wookie.waitForLocation(new WaitArg()
