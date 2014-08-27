@@ -20,9 +20,8 @@ class LoadTimeoutNavigationEvent(override val arg: WaitArg) extends NavigationEv
 
 // redesign: need to provide call back, don't need it outside
 //
-class OkNavigationEvent(_wookieEvent: WookiePageStateChangedEvent, override val arg: WaitArg) extends NavigationEvent(arg){
+class OkNavigationEvent(val wookieEvent: WookiePageStateChangedEvent, override val arg: WaitArg) extends NavigationEvent(arg){
   val ok = true
-  val wookieEvent = _wookieEvent
 }
 
 case class NavigationRecord(arg: WaitArg, promise: Promise[NavigationEvent]){

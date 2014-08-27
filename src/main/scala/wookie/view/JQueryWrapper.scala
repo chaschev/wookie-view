@@ -14,21 +14,21 @@ import scala.util.Random
 /**
  * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
  */
-abstract class CompositionJQueryWrapper(selector:String, wookie:WookieView, url: String) extends JQueryWrapper(selector, wookie, url){
+abstract class CompositionJQueryWrapper(selector: String, wookie:WookieView, url: String, e: NavigationEvent) extends JQueryWrapper(selector, wookie, url, e){
 
 }
 
-class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView, url: String) extends CompositionJQueryWrapper(selector, wookie, url){
+class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView, url: String, e: NavigationEvent) extends CompositionJQueryWrapper(selector, wookie, url, e){
   val function = s"newArrayFn($index)"
 }
 
-class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView, url: String) extends CompositionJQueryWrapper(selector, wookie, url){
+class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView, url: String, e: NavigationEvent) extends CompositionJQueryWrapper(selector, wookie, url, e: NavigationEvent){
   //  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
   private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
   val function = s"newFindFn('$escapedSelector', '$escapedFindSelector')"
 }
 
-class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView, url: String) extends CompositionJQueryWrapper("", wookie, url){
+class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView, url: String, e: NavigationEvent) extends CompositionJQueryWrapper("", wookie, url, e){
   val function = "directFn"
 
   private def assign() = {
@@ -50,14 +50,14 @@ class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView
   }
 }
 
-class SelectorJQueryWrapper(selector: String, wookie:WookieView, url: String) 
-  extends JQueryWrapper(selector, wookie, url){
+class SelectorJQueryWrapper(selector: String, wookie:WookieView, url: String, e: NavigationEvent)
+  extends JQueryWrapper(selector, wookie, url, e){
   
   val function = "jQuery"
 }
 
-abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String){
-  val function:String
+abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String, val e: NavigationEvent){
+  val function: String
 
   val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
 
@@ -120,7 +120,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
   protected def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] =
   {
-    var l = r.getMember("length").asInstanceOf[Int]
+    val l = r.getMember("length").asInstanceOf[Int]
 
     val list = new mutable.MutableList[JQueryWrapper]
 
@@ -134,7 +134,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
       val sObject = slot.asInstanceOf[JSObject]
 
-      list += new DirectWrapper(true, sObject, wookie, url)
+      list += new DirectWrapper(true, sObject, wookie, url, e)
     }
 
     list.toList
@@ -149,7 +149,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     println(s"jQuery object, length=$l")
 
     for (i <- 0 until l) {
-      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie, url)
+      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie, url, e)
     }
 
     list.toList
@@ -166,13 +166,16 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   }
 
   def interact(script: String, timeoutMs: Long = 5000): AnyRef = {
-    WookieView.logger.debug(s"interact: $script")
+    WookieView.logger.debug(s"interact: $script, url=${this.url}, event=$e", new Exception)
 
     val eventId = Random.nextInt()
 
     val latch = new CountDownLatch(1)
 
-    var r:AnyRef = null
+    var r: AnyRef = null
+
+    // todo: remove this line when there is no
+    val url = wookie.getEngine.getDocument.getDocumentURI
 
     wookie.includeStuffOnPage(eventId, url, Some(() => {
       WookieView.logger.debug(s"executing $script")

@@ -1,18 +1,18 @@
-var $clickIt = function(sel){
-    clickIt(jQuery(sel))
+var clickJquerySelector = function(sel){
+    clickJqueryResult(jQuery(sel))
 };
 
-var clickIt = function($el){
+var clickJqueryResult = function($el){
   var el = $el[0];
   var etype = 'click';
 
-  clickDom(el, etype);
+  clickDomElement(el, etype);
 };
 
 var clickItem = function(operationFn, $sel){
     alert("about to click: " + jQuery_text(operationFn, $sel, true));
 
-    clickIt(operationFn($sel));
+    clickJqueryResult(operationFn($sel));
 };
 
 var submitEnclosingForm = function(operationFn, sel){
@@ -28,7 +28,7 @@ var pressKey = function(sel, code){
 //    alert("triggered " + JSON.stringify(p));
 };
 
-var clickDom = function(el, etype){
+var clickDomElement = function(el, etype){
   if (el.fireEvent) {
     el.fireEvent('on' + etype);
   } else {
@@ -124,7 +124,7 @@ var jQueryAttrs = function(operationFn, $sel){
     var nodes=[], values=[];
     var el =  r[0];
 
-    for (var attr, i = 0, attrs=el.attributes, l=attrs.length; i<l; i++){
+    for (var attr, i = 0, attrs = el.attributes, l=attrs.length; i<l; i++){
         attr = attrs.item(i);
         nodes.push(attr.nodeName);
         values.push(attr.nodeValue);

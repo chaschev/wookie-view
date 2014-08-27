@@ -3,13 +3,17 @@ package wookie.view
 import scala.concurrent.Promise
 import scala.util.Random
 
+trait WhenPageLoaded {
+  def apply()(implicit e: NavigationEvent)
+}
+
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
 class WaitArg(var name: String = ""){
   //  var predicate:Option[((String, String, NavArg) => Boolean)] = None
   var timeoutMs: Option[Int] = Some(10000)
-  private[this] var handler: Option[(NavigationEvent)=>Unit] = None
+  private[this] var handler: Option[WhenPageLoaded] = None
   var async: Boolean = true
   var isPageReadyEvent:Boolean = true
 
@@ -23,7 +27,7 @@ class WaitArg(var name: String = ""){
   def timeoutNone(): WaitArg = {this.timeoutMs = None; this}
   def timeoutMs(i:Int): WaitArg = {this.timeoutMs = Some(i); this}
   def timeoutSec(sec:Int): WaitArg = {this.timeoutMs = Some(sec * 1000);this}
-  def whenLoaded(h:(NavigationEvent) => Unit): WaitArg = {this.handler = Some(h); this}
+  def whenLoaded(whenPageLoaded:WhenPageLoaded): WaitArg = {this.handler = Some(whenPageLoaded); this}
   def async(b: Boolean): WaitArg = {this.async = b; this}
   def withName(n: String): WaitArg = {this.name = n; this}
 
@@ -49,7 +53,7 @@ class WaitArg(var name: String = ""){
 
   def isPageReadyEvent(isPageReady: Boolean): WaitArg = {this.isPageReadyEvent = isPageReady; this}
 
-  protected[wookie] def handleIfDefined(e: NavigationEvent) = if(this.handler.isDefined) this.handler.get.apply(e)
+  protected[wookie] def handleIfDefined(e: NavigationEvent) = if(this.handler.isDefined) this.handler.get.apply()(e)
 
   //todo make package local
   protected[wookie] def startedAtMs(t: Long): WaitArg = {this.startedAtMs = t; this}

@@ -10,14 +10,18 @@ import javafx.stage.Stage
 
 import chaschev.util.Exceptions
 import org.slf4j.LoggerFactory
-import wookie.view.{NavigationEvent, JQueryWrapper, WookieView}
+import wookie.view._
+
+trait JQuerySupplier {
+  def apply(selector: String)(implicit e: NavigationEvent): JQueryWrapper
+}
 
 class WookieScenario(
                      val title: String,
                      val url: Option[String] = None,
 //                     val init: Option[()=>Unit] = None,
                      val panel: () => WookiePanel,
-                     val procedure: (WookiePanel, WookieView, (String) => JQueryWrapper) => Unit){
+                     val procedure: (WookiePanel, WookieView, JQuerySupplier) => Unit){
   def newPanel(): WookiePanel = panel()
 }
 
@@ -96,11 +100,19 @@ class WookieSandboxApp extends Application {
         val wookie = panel.wookie
 
         if(ws.url.isDefined) {
-          wookie.load(ws.url.get, (e: NavigationEvent) => {
-            ws.procedure(panel, wookie, (s) => wookie.$(s, ws.url.get))
+          wookie.load(ws.url.get, new WhenPageLoaded {
+            override def apply()(implicit e: NavigationEvent): Unit = {
+              ws.procedure(panel, wookie, new JQuerySupplier {
+                override def apply(selector: String)(implicit e: NavigationEvent): JQueryWrapper =
+                  wookie.$(selector, ws.url.get)
+              })
+            }
           })
         } else {
-          ws.procedure(panel, wookie, (s) => wookie.$(s, "not defined"))
+          ws.procedure(panel, wookie, new JQuerySupplier {
+            override def apply(selector: String)(implicit e: NavigationEvent): JQueryWrapper =
+              wookie.$(selector, e.asInstanceOf[OkNavigationEvent].wookieEvent.newLoc)
+          })
         }
       }
     })

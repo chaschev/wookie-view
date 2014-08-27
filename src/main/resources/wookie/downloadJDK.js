@@ -51,7 +51,7 @@ var downloadIfFound = function(version, x64, platform){
 
     if($a){
         try{
-            clickIt($a);
+            clickJqueryResult($a);
         }catch(e){
             alert("error: " + e)
         }

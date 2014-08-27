@@ -71,14 +71,15 @@ object DownloadJDK {
           wookie.waitForLocation(new WaitArg()
             .timeoutNone()
             .matchByLocation(_.contains("signon.jsp"))
-            .whenLoaded((e) => {
+            .whenLoaded(new WhenPageLoaded {
+            override def apply()(implicit e: NavigationEvent): Unit = {
+              logger.info(s"signon form: ${$("#sso_username")}")
 
-            logger.info(s"signon form: ${$("#sso_username")}")
+              $("#sso_username").value(login)
+              $("#ssopassword").value(password)
 
-            $("#sso_username").value(login)
-            $("#ssopassword").value(password)
-
-            $(".submit_btn").clickLink()
+              $(".submit_btn").clickLink()
+            }
           }))
 
           // this is download detection by an url
@@ -162,7 +163,8 @@ object DownloadJDK {
 
   private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit) =
   {
-    browser.load(archiveUrl, (event:NavigationEvent) => {
+    browser.load(archiveUrl, new WhenPageLoaded {
+      override def apply()(implicit e: NavigationEvent): Unit = {
         try {
           val aBoolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadJDK.version + "', true, 'linux');").asInstanceOf[Boolean]
 
@@ -174,6 +176,7 @@ object DownloadJDK {
         } catch {
           case e: Exception => e.printStackTrace
         }
-      })
+      }
+    })
   }
 }

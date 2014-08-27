@@ -109,13 +109,13 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   protected val scheduler = Executors.newScheduledThreadPool(4)
 
-  case class JSHandler(eventId: Int, latch: CountDownLatch, handler: Option[() => Unit]) {
+  case class PageOnLoadHandler(eventId: Int, latch: CountDownLatch, handler: Option[() => Unit]) {
 
   }
 
   def getHistory: JIterable[String] = webEngine.getHistory.getEntries.map(x => x.getUrl)
 
-  private final val jsHandlers = new ConcurrentHashMap[Integer, JSHandler]
+  private final val jsHandlers = new ConcurrentHashMap[Integer, PageOnLoadHandler]
 
   {
     if (webView.isDefined) {
@@ -192,82 +192,83 @@ class WookieView(builder: WookieBuilder) extends Pane {
       .timeoutNone()
       .withMatcher(matcher)
       .isPageReadyEvent(false)
-      .whenLoaded((event) => {
+      .whenLoaded(new WhenPageLoaded {
+      override def apply()(implicit event: NavigationEvent): Unit = {
+        //copy-pasted magic
+        val navEvent = event.asInstanceOf[OkNavigationEvent]
 
-      //copy-pasted magic
-      val navEvent = event.asInstanceOf[OkNavigationEvent]
+        val uri = navEvent.wookieEvent.newLoc
 
-      val uri = navEvent.wookieEvent.newLoc
+        spawn {
+          Thread.currentThread().setName("fx-downloader")
 
-      spawn {
-        Thread.currentThread().setName("fx-downloader")
+          try {
+            //there must be a shorter way to do this
 
-        try {
-          //there must be a shorter way to do this
+            val httpClient = new DefaultHttpClient
+            val httpget = new HttpGet(uri)
+            val response = httpClient.execute(httpget)
 
-          val httpClient = new DefaultHttpClient
-          val httpget = new HttpGet(uri)
-          val response = httpClient.execute(httpget)
+            val code = response.getStatusLine.getStatusCode
 
-          val code = response.getStatusLine.getStatusCode
+            if (code != 200) {
+              System.out.println(IOUtils.toString(response.getEntity.getContent))
+              throw new RuntimeException("failed to download: " + uri)
+            }
 
-          if (code != 200) {
-            System.out.println(IOUtils.toString(response.getEntity.getContent))
-            throw new RuntimeException("failed to download: " + uri)
-          }
+            val file = new File(options.downloadDir, StringUtils.substringBefore(FilenameUtils.getName(uri), "?"))
 
-          val file = new File(options.downloadDir, StringUtils.substringBefore(FilenameUtils.getName(uri), "?"))
+            val httpEntity = response.getEntity
+            val length = httpEntity.getContentLength
 
-          val httpEntity = response.getEntity
-          val length = httpEntity.getContentLength
+            val os = new CountingOutputStream(new FileOutputStream(file))
 
-          val os = new CountingOutputStream(new FileOutputStream(file))
+            println(s"Downloading $uri to $file...")
 
-          println(s"Downloading $uri to $file...")
+            var lastProgress = 0.0
+            var isProgressRunning = true
 
-          var lastProgress = 0.0
-          var isProgressRunning = true
+            spawn {
+              Thread.currentThread().setName("progressThread")
 
-          spawn {
-            Thread.currentThread().setName("progressThread")
+              while (isProgressRunning) {
+                val bytesCopied = os.getCount
+                val progress = bytesCopied * 100D / length
 
-            while (isProgressRunning) {
-              val bytesCopied = os.getCount
-              val progress = bytesCopied * 100D / length
+                if (progress != lastProgress) {
+                  val s = s"${file.getName}: ${FileUtils.humanReadableByteCount(bytesCopied, false, false)}/${FileUtils.humanReadableByteCount(length, false, true)} ${LangUtils.toConciseString(progress, 1)}%"
 
-              if (progress != lastProgress) {
-                val s = s"${file.getName}: ${FileUtils.humanReadableByteCount(bytesCopied, false, false)}/${FileUtils.humanReadableByteCount(length, false, true)} ${LangUtils.toConciseString(progress, 1)}%"
+                  setDownloadStatus(progressLabel, s)
 
-                setDownloadStatus(progressLabel, s)
+                  print("\r" + s)
+                }
 
-                print("\r" + s)
-              }
+                lastProgress = progress
+                progressBar.setProgress(bytesCopied * 1D / length)
 
-              lastProgress = progress
-              progressBar.setProgress(bytesCopied * 1D / length)
-
-              try {
-                Thread.sleep(500)
-              }
-              catch {
-                case e: InterruptedException => //ignore
+                try {
+                  Thread.sleep(500)
+                }
+                catch {
+                  case e: InterruptedException => //ignore
+                }
               }
             }
+
+            ByteStreams.copy(httpEntity.getContent, os)
+
+            isProgressRunning = false
+
+            logger.info("download complete")
+
+            downloadPromise.complete(Try(new DownloadResult(Some(file), "", true)))
           }
-
-          ByteStreams.copy(httpEntity.getContent, os)
-
-          isProgressRunning = false
-
-          logger.info("download complete")
-
-          downloadPromise.complete(Try(new DownloadResult(Some(file), "", true)))
-        }
-        catch {
-          case e: Exception =>
-            LoggerFactory.getLogger("log").warn("", e)
-            downloadPromise.complete(Try(new DownloadResult(None, e.getMessage, false)))
-            throw Exceptions.runtime(e)
+          catch {
+            case e: Exception =>
+              LoggerFactory.getLogger("log").warn("", e)
+              downloadPromise.complete(Try(new DownloadResult(None, e.getMessage, false)))
+              throw Exceptions.runtime(e)
+          }
         }
       }
     }))
@@ -335,8 +336,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def getEngine: WebEngine = webEngine
 
-  private[wookie] def jsReady(eventId: Int, from: String)
-  {
+  private[wookie] def jsReady(eventId: Int, from: String) {
     logger.info(s"event $eventId arrived from $from")
 
     val jsHandler = jsHandlers.get(eventId)
@@ -378,16 +378,18 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def load(location: String, r: Runnable): WookieView =
   {
-    load(location, Some((event:NavigationEvent) => {
-      r.run()
+    load(location, Some(new WhenPageLoaded {
+      override def apply()(implicit e: NavigationEvent): Unit = {
+        r.run()
+      }
     }))
   }
 
-  def load(location: String, onLoad: (NavigationEvent) => Unit):WookieView = {
+  def load(location: String, onLoad: WhenPageLoaded):WookieView = {
     load(location, Some(onLoad))
   }
 
-  protected def load(location: String, onLoad: Option[(NavigationEvent) => Unit] = None): WookieView = {
+  protected def load(location: String, onLoad: Option[WhenPageLoaded] = None): WookieView = {
     val arg = new WaitArg()
     
     if(onLoad.isDefined) arg.whenLoaded(onLoad.get)
@@ -443,7 +445,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       urls += s"https://ajax.googleapis.com/ajax/libs/jquery/${WookieView.JQUERY_VERSION}/jquery.min.js"
     }
 
-    var latchCount = 1 // 1 is for clicks.js
+    var latchCount = 1 // 1 is for wookie.js
 
     latchCount += urls.length // for all the urls
 
@@ -453,7 +455,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     val latch = new CountDownLatch(latchCount)
 
-    val handler = new JSHandler(eventId, latch, onLoad)
+    val handler = new PageOnLoadHandler(eventId, latch, onLoad)
 
     if (jsHandlers.putIfAbsent(eventId, handler) != null) {
       return SFuture successful true
@@ -495,9 +497,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def initClicksJs(eventId: Int)
   {
-    val clicksJs = io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/clicks.js")).mkString
+    val wookieJs = io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/wookie.js")).mkString
 
-    insertJS(eventId, new JSScript(Array.empty, Some(clicksJs), Some("clicks.js")))
+    insertJS(eventId, new JSScript(Array.empty, Some(wookieJs), Some("wookie.js")))
   }
 
   case class JSScript(urls: Array[String], text: Option[String], name:Option[String] = None) {
@@ -571,7 +573,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     Platform.runLater(new Runnable {
       override def run(): Unit =
       {
-        val s = s"$$clickIt($jQuery)"
+        val s = s"clickJquerySelector($jQuery)"
 
         println(s"executing $s")
 
@@ -580,17 +582,20 @@ class WookieView(builder: WookieBuilder) extends Pane {
     })
   }
 
+//  added nav event to the $
+//  now I need to add debug info to interact method
+
   /**
    * Todo: change into a wrapper object with methods: html(), text(), attr()
    * @param jQuerySelector
    * @return
    */
-  def $(jQuerySelector: String, url: String): JQueryWrapper =
+  def $(jQuerySelector: String, url: String)(implicit e: NavigationEvent): JQueryWrapper =
   {
     val sel = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
 
     val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]
 
-    new DirectWrapper(false, $obj, this, url)
+    new DirectWrapper(false, $obj, this, url, e)
   }
 }
