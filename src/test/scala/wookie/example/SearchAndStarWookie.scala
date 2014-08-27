@@ -75,6 +75,9 @@ object SearchAndStarWookie {
 
                   if(starButton.text().contains("Star")) {
                     starButton.mouseClick()
+                    println("Now the star will shine!")
+                  } else {
+                    println("Invoke me under my stars!")
                   }
               }))
 

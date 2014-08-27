@@ -14,21 +14,21 @@ import scala.util.Random
 /**
  * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
  */
-abstract class CompositionJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
+abstract class CompositionJQueryWrapper(selector:String, wookie:WookieView, url: String) extends JQueryWrapper(selector, wookie, url){
 
 }
 
-class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
+class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView, url: String) extends CompositionJQueryWrapper(selector, wookie, url){
   val function = s"newArrayFn($index)"
 }
 
-class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView) extends CompositionJQueryWrapper(selector, wookie){
+class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView, url: String) extends CompositionJQueryWrapper(selector, wookie, url){
   //  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
   private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
   val function = s"newFindFn('$escapedSelector', '$escapedFindSelector')"
 }
 
-class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView) extends CompositionJQueryWrapper("", wookie){
+class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView, url: String) extends CompositionJQueryWrapper("", wookie, url){
   val function = "directFn"
 
   private def assign() = {
@@ -50,11 +50,13 @@ class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView
   }
 }
 
-class SelectorJQueryWrapper(selector:String, wookie:WookieView) extends JQueryWrapper(selector, wookie){
+class SelectorJQueryWrapper(selector: String, wookie:WookieView, url: String) 
+  extends JQueryWrapper(selector, wookie, url){
+  
   val function = "jQuery"
 }
 
-abstract class JQueryWrapper(selector:String, wookie:WookieView){
+abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String){
   val function:String
 
   val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
@@ -106,7 +108,7 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
     this
   }
 
-  def value(value:String):JQueryWrapper = {
+  def value(value:String): JQueryWrapper = {
     interact(s"jQuerySetValue($function, '$escapedSelector').val('$value')")
     this
   }
@@ -132,7 +134,7 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
 
       val sObject = slot.asInstanceOf[JSObject]
 
-      list += new DirectWrapper(true, sObject, wookie)
+      list += new DirectWrapper(true, sObject, wookie, url)
     }
 
     list.toList
@@ -140,25 +142,25 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
 
   protected def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] =
   {
-    var l = r.getMember("length").asInstanceOf[Int]
+    val l = r.getMember("length").asInstanceOf[Int]
 
     val list = new mutable.MutableList[JQueryWrapper]
 
     println(s"jQuery object, length=$l")
 
     for (i <- 0 until l) {
-      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie)
+      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie, url)
     }
 
     list.toList
   }
 
-  def pressKey(code:Int):JQueryWrapper = {
+  def pressKey(code:Int): JQueryWrapper = {
     interact(s"pressKey('$escapedSelector', $code)")
     this
   }
 
-  def pressEnter():JQueryWrapper = {
+  def pressEnter(): JQueryWrapper = {
     pressKey(13)
     this
   }
@@ -166,7 +168,6 @@ abstract class JQueryWrapper(selector:String, wookie:WookieView){
   def interact(script: String, timeoutMs: Long = 5000): AnyRef = {
     WookieView.logger.debug(s"interact: $script")
 
-    val url = wookie.getEngine.getDocument.getDocumentURI
     val eventId = Random.nextInt()
 
     val latch = new CountDownLatch(1)

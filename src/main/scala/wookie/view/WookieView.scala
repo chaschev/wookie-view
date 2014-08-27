@@ -34,11 +34,25 @@ import scala.concurrent.{Await, Promise, Future => SFuture}
 import scala.util.{Random, Try}
 
 
-case class WookieNavigationEvent(newLoc: String, oldLoc: String, isPageReadyEvent: Boolean)
-
-case class DownloadResult(file:Option[File], message:String, ok:Boolean){
-
+abstract class WookiePageStateChangedEvent{
+  def newLoc: String
 }
+
+case class WookieNavigationEvent (
+    newLoc: String, 
+    oldLoc: String, 
+    isPageReadyEvent: Boolean
+) extends WookiePageStateChangedEvent
+
+case class TimerPageStateEvent (
+  newLoc: String
+) extends WookiePageStateChangedEvent
+
+case class DownloadResult(
+   file: Option[File], 
+   message: String, 
+   ok: Boolean
+)
 
 /**
  * WookieBrowser.
@@ -52,16 +66,13 @@ case class DownloadResult(file:Option[File], message:String, ok:Boolean){
 object WookieView {
   final val JQUERY_VERSION = "1.9.1"
 
-  def newBuilder: WookieBuilder =
-  {
+  def newBuilder: WookieBuilder = {
     new WookieBuilder()
   }
 
-  def logOnAlert(message: String)
-  {
+  def logOnAlert(message: String) {
     LoggerFactory.getLogger("wk-alert").info(message)
   }
-
 
   final val logger = LoggerFactory.getLogger(classOf[WookieView])
 }
@@ -92,7 +103,8 @@ class WookieView(builder: WookieBuilder) extends Pane {
   val progressLabel = new Label("")
   val progressBar = new ProgressBar(0)
 
-  protected val history = mutable.MutableList[String]()
+  protected val loadedLocationsHistory = mutable.MutableList[String]()
+  protected val queriedLocationsHistory = mutable.MutableList[String]()
   protected val navigationPredicates: JSet[NavigationRecord] = Sets.newConcurrentHashSet()
 
   protected val scheduler = Executors.newScheduledThreadPool(4)
@@ -155,7 +167,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       {
         logger.info(s"location changed to $newLoc")
 
-        history += newLoc
+        loadedLocationsHistory += newLoc
         
         val handlers = scanHandlers(new WookieNavigationEvent(newLoc, oldLoc, false))
 
@@ -165,11 +177,12 @@ class WookieView(builder: WookieBuilder) extends Pane {
       }
     })
     
-    scheduler.schedule(new Runnable {
+    scheduler.scheduleAtFixedRate(new Runnable {
       override def run(): Unit = {
-        scanHandlers(new WookieNavigationEvent("", "", false))
+        logger.debug("scanning handlers...")
+        scanHandlers(new TimerPageStateEvent(queriedLocationsHistory.last))
       }
-    }, 50, TimeUnit.MILLISECONDS)
+    }, 50, 50, TimeUnit.MILLISECONDS)
   }
 
   def waitForDownloadToStart(matcher: NavigationMatcher): SFuture[DownloadResult] = {
@@ -273,7 +286,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
   }
 
 
-  protected def scanHandlers(w: WookieNavigationEvent): mutable.MutableList[NavigationEvent] = {
+  protected def scanHandlers(e: WookiePageStateChangedEvent): mutable.MutableList[NavigationEvent] = {
     val it = navigationPredicates.iterator()
 
     val matchingEntries = mutable.MutableList[NavigationEvent]()
@@ -284,7 +297,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       val isDue = r.arg.isDue
 
       if(isDue) {
-        val event = new NokNavigationEvent(r.arg)
+        val event = new LoadTimeoutNavigationEvent(r.arg)
 
         r.promise.complete(Try(event))
         it.remove()
@@ -293,17 +306,24 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
         logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationPredicates.size()}")
       }else{
-        val eventTypeOk = r.arg.isPageReadyEvent == w.isPageReadyEvent
+        e match {
+          // predicates work only for non-timer events
+          // so we wait for a page to load before making checks
+          case locEvent: WookieNavigationEvent =>
+            val eventTypeOk = r.arg.isPageReadyEvent == locEvent.isPageReadyEvent
 
-        if(eventTypeOk && r.arg.matcher.matches(r, w)){
-          val event = new OkNavigationEvent(w, r.arg)
-          
-          r.promise.complete(Try(event))
-          it.remove()
+            if (eventTypeOk && r.arg.matcher.matches(r, locEvent)) {
+              val event = new OkNavigationEvent(e, r.arg)
 
-          matchingEntries += event
+              r.promise.complete(Try(event))
+              it.remove()
 
-          logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
+              matchingEntries += event
+
+              logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
+            }
+          case _ =>
+            false
         }
       }
     }
@@ -390,6 +410,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     
     waitForLocation(arg)
 
+    queriedLocationsHistory += canonizedUrl
     webEngine.load(canonizedUrl)
 
     this
@@ -400,6 +421,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
    */
   private[wookie] def includeStuffOnPage(eventId: Int, location: String, onLoad: Option[() => Unit]): SFuture[Boolean] =
   {
+    logger.debug(s"including stuff on page for eventId $eventId, location $location")
     try {
       val s = webEngine.executeScript(s"'' + window.__wookiePageInitialized").asInstanceOf[String]
       if (s == "true") {
@@ -563,12 +585,12 @@ class WookieView(builder: WookieBuilder) extends Pane {
    * @param jQuerySelector
    * @return
    */
-  def $(jQuerySelector: String): JQueryWrapper =
+  def $(jQuerySelector: String, url: String): JQueryWrapper =
   {
     val sel = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
 
     val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]
 
-    new DirectWrapper(false, $obj, this)
+    new DirectWrapper(false, $obj, this, url)
   }
 }

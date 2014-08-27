@@ -97,10 +97,10 @@ class WookieSandboxApp extends Application {
 
         if(ws.url.isDefined) {
           wookie.load(ws.url.get, (e: NavigationEvent) => {
-            ws.procedure(panel, wookie, (s) => wookie.$(s))
+            ws.procedure(panel, wookie, (s) => wookie.$(s, ws.url.get))
           })
         } else {
-          ws.procedure(panel, wookie, (s) => wookie.$(s))
+          ws.procedure(panel, wookie, (s) => wookie.$(s, "not defined"))
         }
       }
     })
