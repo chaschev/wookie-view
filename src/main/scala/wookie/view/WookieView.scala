@@ -38,11 +38,24 @@ abstract class WookiePageStateChangedEvent(val pageLoadedId: Int){
   def newLoc: String
 }
 
-case class WookieNavigationEvent(override val pageLoadedId: Int,
+abstract class WookieNavigationEvent(
+    override val pageLoadedId: Int,
     newLoc: String,
-    oldLoc: String,
-    isPageReadyEvent: Boolean
+    oldLoc: String
 ) extends WookiePageStateChangedEvent(pageLoadedId)
+
+case class PageReadyEvent(
+       override val pageLoadedId: Int,
+       newLoc: String,
+       oldLoc: String
+ ) extends WookieNavigationEvent(pageLoadedId, newLoc, oldLoc)
+
+case class LocationChangedEvent(
+   override val pageLoadedId: Int,
+   newLoc: String,
+   oldLoc: String
+) extends WookieNavigationEvent(pageLoadedId, newLoc, oldLoc)
+
 
 case class TimerPageStateEvent (
   override val pageLoadedId: Int,
@@ -116,7 +129,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def getHistory: JIterable[String] = webEngine.getHistory.getEntries.map(x => x.getUrl)
 
-  private final val jsInteractionIdsToHandlers = new ConcurrentHashMap[Integer, PageOnLoadHandler]
+  private final val jsInteractionIdsToHandlers = new ConcurrentHashMap[Int, PageOnLoadHandler]
 
   {
     if (webView.isDefined) {
@@ -146,7 +159,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
           includeStuffOnPage(pageLoadedId, currentLocation, Some(() => {
             logger.info(s"stuff loaded: $currentLocation")
 
-            val handlers = scanHandlers(new WookieNavigationEvent(pageLoadedId, currentLocation, "", true))
+            val handlers = scanNavRecords(new PageReadyEvent(pageLoadedId, currentLocation, ""))
 
             logger.debug(s"stateProperty (pageReady): found ${handlers.size} handlers, processing....")
 
@@ -154,8 +167,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
                 event.arg.handleIfDefined(event)
             })
           }))
-            //todo: provide navigation event which comes from two sources - location & page ready
-            //todo: includeStuffOnPage should fix the very old inclusion issue!!
         } else
         if(newState == Worker.State.FAILED || newState == Worker.State.FAILED ){
           logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
@@ -171,19 +182,24 @@ class WookieView(builder: WookieBuilder) extends Pane {
         logger.info(s"location changed to $newLoc")
 
         changedLocationsHistory += newLoc
-        
-//        val handlers = scanHandlers(new WookieNavigationEvent(random.nextInt(), newLoc, oldLoc, false))
-//
-//        handlers.foreach(event => {
-//          event.arg.handleIfDefined(event)
-//        })
+
+//        before I thought that page ready is not being called when you click on a button to redirect
+        val handlers = scanNavRecords(new LocationChangedEvent(random.nextInt(), newLoc, oldLoc))
+
+        handlers.foreach(event => {
+          event.arg.handleIfDefined(event)
+        })
       }
     })
     
+    registerScanningTimer()
+  }
+  
+  private[this] def registerScanningTimer() = {
     scheduler.scheduleAtFixedRate(new Runnable {
       override def run(): Unit = {
         logger.debug("scanning handlers...")
-        val handlers = scanHandlers(new TimerPageStateEvent(random.nextInt(), queriedLocationsHistory.last))
+        val handlers = scanNavRecords(new TimerPageStateEvent(random.nextInt(), queriedLocationsHistory.last))
 
         handlers.foreach(event => {
           event.arg.handleIfDefined(event)
@@ -205,7 +221,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     waitForLocation(new WaitArg()
       .timeoutNone()
       .withMatcher(matcher)
-      .isPageReadyEvent(false)
+      .filterEvents(e => e.isInstanceOf[LocationChangedEvent])
       .whenLoaded(new WhenPageLoaded {
       override def apply()(implicit event: PageDoneEvent): Unit = {
         //copy-pasted magic
@@ -300,8 +316,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     })
   }
 
-
-  protected def scanHandlers(e: WookiePageStateChangedEvent): mutable.MutableList[PageDoneEvent] = {
+  protected def scanNavRecords(e: WookiePageStateChangedEvent): mutable.MutableList[PageDoneEvent] = {
     logger.debug(s"scanning ${navigationRecords.size()} records...")
 
     val it = navigationRecords.iterator()
@@ -327,9 +342,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
           // predicates work only for non-timer events
           // so we wait for a page to load before making checks
           case locEvent: WookieNavigationEvent =>
-            val eventTypeOk = r.arg.isPageReadyEvent == locEvent.isPageReadyEvent
+            val eventIsOk = r.arg.acceptsEvent(e)
 
-            if (eventTypeOk && r.arg.matcher.matches(r, locEvent)) {
+            if (eventIsOk && r.arg.matcher.matches(r, locEvent)) {
               val event = new OkPageDoneEvent(e, r.arg)
 
               r.promise.complete(Try(event))
@@ -374,7 +389,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
 
   /**
-   * Waits for a location to change.
+   * Waits for a location to change. Just adds a record to an arrays which is scanned with periods of time.
    */
   def waitForLocation(arg: WaitArg): NavigationRecord = {
     val record: NavigationRecord = arg.startedAtMs(System.currentTimeMillis()).toNavigationRecord
@@ -440,6 +455,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
   {
     logger.debug(s"including stuff on page for interactionId $interactionId, location $location")
     try {
+      // check a flag showing that stuff is included
       val s = webEngine.executeScript(s"'' + window.__wookiePageInitialized").asInstanceOf[String]
       if (s == "true") {
         logger.debug(s"wookie page $location already initialized")
@@ -452,7 +468,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       case e: Exception => logger.debug("exception", e)
     }
 
-    logger.info(s"initializing $location")
+    logger.info(s"including stuff at location: $location")
 
     val urls = mutable.MutableList(options.includeJsUrls: _*)
 
@@ -460,13 +476,11 @@ class WookieView(builder: WookieBuilder) extends Pane {
       urls += s"https://ajax.googleapis.com/ajax/libs/jquery/${WookieView.JQUERY_VERSION}/jquery.min.js"
     }
 
-    var latchCount = 1 // 1 is for wookie.js
+    var latchCount = 1        // 1 is for wookie.js
 
     latchCount += urls.length // for all the urls
 
-    if(options.includeJsScript.isDefined) latchCount += 1
-
-    //    if(includeJsScript.isDefined) latchCount += 1   // for user's JS
+    if(options.includeJsScript.isDefined) latchCount += 1 // custom JS to include
 
     val latch = new CountDownLatch(latchCount)
 
@@ -525,8 +539,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }
   }
 
-  protected def insertJQuery(interactionId: Int, version: String)
-  {
+  protected def insertJQuery(interactionId: Int, version: String) {
     if (!isJQueryAvailableAtPage) {
       insertJavaScripts(interactionId, new JSScript(Array[String](s"https://ajax.googleapis.com/ajax/libs/jquery/$version/jquery.min.js"), None))
     } else {
@@ -535,8 +548,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
   }
 
 
-  protected def isJQueryAvailableAtPage: Boolean =
-  {
+  protected def isJQueryAvailableAtPage: Boolean =  {
     !webEngine.executeScript(s"typeof jQuery == 'undefined'").asInstanceOf[Boolean]
   }
 
@@ -549,30 +561,31 @@ class WookieView(builder: WookieBuilder) extends Pane {
     val isUrlsMode = jsScript.text.isEmpty
 
     if (isUrlsMode) {
-       val script =s"" +
-        s"" +
-        s"function __loadScripts(array){\n" +
-        s"  alert('loading ' + array.length + ' urls');\n" +
-        s"  for(var i = 0; i < array.length; i++){\n" +
-        s"    var text = array[i];\n" +
-        s"    script = document.createElement('script');\n\n" +
-        s"    \n" +
-        s"    script.onload = function() {\n" +
-        s"      try{\n      " +
-        s"        window.simpleBrowser.jsReady($interactionId, 'url ' + text);\n" +
-        s"      } catch(e){\n" +
-        s"        alert(e);\n" +
-        s"      }\n" +
-        s"    };\n" +
-        s"    " +
-        s"    var head = document.getElementsByTagName('head')[0];\n\n" +
-        s"    " +
-        s"    script.type = 'text/javascript';\n" +
-        s"    script.src = text;\n\n" +
-        s"    head.appendChild(script);\n" +
-        s"  }\n" +
-        s"}\n" +
-        s"__loadScripts([" + jsScript.urls.map("'" + _ + "'").mkString(", ") + s"])"
+       val script =
+         s"""
+            |function __loadScripts(array){
+            |  alert('loading ' + array.length + ' urls');
+            |  for(var i = 0; i < array.length; i++){
+            |    var text = array[i];
+            |    script = document.createElement('script');
+            |
+            |
+            |    script.onload = function() {
+            |      try{
+            |              window.simpleBrowser.jsReady($interactionId, 'url ' + text);
+            |      } catch(e){
+            |        alert(e);
+            |      }
+            |    };
+            |        var head = document.getElementsByTagName('head')[0];
+            |
+            |        script.type = 'text/javascript';
+            |    script.src = text;
+            |
+            |    head.appendChild(script);
+            |  }
+            |}
+            |__loadScripts([${jsScript.urls.map("'" + _ + "'").mkString(", ")}])""".stripMargin
 
       webEngine.executeScript(script)
     } else {
@@ -582,23 +595,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
   }
 
   def getHTML: String = webEngine.executeScript("document.getElementsByTagName('html')[0].innerHTML").asInstanceOf[String]
-
-  def click(jQuery: String)
-  {
-    Platform.runLater(new Runnable {
-      override def run(): Unit =
-      {
-        val s = s"clickJquerySelector($jQuery)"
-
-        println(s"executing $s")
-
-        getEngine.executeScript(s)
-      }
-    })
-  }
-
-//  added nav event to the $
-//  now I need to add debug info to interact method
 
   /**
    * Todo: change into a wrapper object with methods: html(), text(), attr()

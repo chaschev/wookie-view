@@ -15,12 +15,12 @@ class WaitArg(var name: String = ""){
   var timeoutMs: Option[Int] = Some(30000)
   private[this] var handler: Option[WhenPageLoaded] = None
   var async: Boolean = true
-  var isPageReadyEvent:Boolean = true
+  var eventFilter: Option[(WookiePageStateChangedEvent) => Boolean] = Some(e => e.isInstanceOf[PageReadyEvent])
 
   val eventId: Int = Random.nextInt()  //currently not really used
 
   var startedAtMs:Long = -1
-  var location:Option[String] = if(name.equals("")) None else Some(name)
+  var location: Option[String] = if(name.equals("")) None else Some(name)
 
   private[this] var navigationMatcher:NavigationMatcher = NextPageReadyMatcher.instance
 
@@ -42,7 +42,14 @@ class WaitArg(var name: String = ""){
     this.navigationMatcher = NextPageReadyMatcher.instance; this
   }
 
-  def matchOnlyPageReadyEvent(b: Boolean): WaitArg = {this.isPageReadyEvent = b; this}
+  def filterEvents(eventFilter: (WookiePageStateChangedEvent) => Boolean): WaitArg = {this.eventFilter = Some(eventFilter); this}
+
+  private[view] def acceptsEvent(e: WookiePageStateChangedEvent): Boolean = {
+    if(eventFilter.isDefined)
+      eventFilter.get.apply(e)
+    else
+      true
+  }
 
   def matchByPredicate(p:((WookieNavigationEvent, WaitArg) => Boolean)):WaitArg = {
     this.navigationMatcher = new PredicateMatcher(p); this
@@ -51,7 +58,6 @@ class WaitArg(var name: String = ""){
   def location(_s: String): WaitArg = {this.location = Some(_s); this}
   def matcher = navigationMatcher
 
-  def isPageReadyEvent(isPageReady: Boolean): WaitArg = {this.isPageReadyEvent = isPageReady; this}
 
   protected[wookie] def handleIfDefined(e: PageDoneEvent) = if(this.handler.isDefined) this.handler.get.apply()(e)
 
