@@ -85,7 +85,7 @@ object DownloadJDK {
           // this is download detection by an url
           wookie.waitForDownloadToStart(
             new LocationMatcher(loc =>
-              loc.contains("download.oracle") && loc.contains("?")
+              loc.contains("download.oracle.com") && loc.contains("?")
             )
           ).andThen({ case result =>
             logger.info(s"download done: $result")

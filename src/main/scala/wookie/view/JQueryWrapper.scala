@@ -12,24 +12,17 @@ import scala.util.Random
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
+
 /**
- * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
+ * An abstract wrapper for i.e. find in "$(sel).find()" or an array items: $($(sel)[3])
+ *
+ * Now only the direct wrapper is used which seems to be working stable. So this class might be obsolete.
  */
-abstract class CompositionJQueryWrapper(selector: String, wookie:WookieView, url: String, e: PageDoneEvent) extends JQueryWrapper(selector, wookie, url, e){
+abstract class CompositionJQueryWrapper(selector: String, wookie: WookieView, url: String, e: PageDoneEvent) extends JQueryWrapper(selector, wookie, url, e){
 
 }
 
-class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper(selector, wookie, url, e){
-  val function = s"newArrayFn($index)"
-}
-
-class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper(selector, wookie, url, e: PageDoneEvent){
-  //  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
-  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
-  val function = s"newFindFn('$escapedSelector', '$escapedFindSelector')"
-}
-
-class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper("", wookie, url, e){
+class DirectWrapper(isDom: Boolean = false, jsObject: JSObject,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper("", wookie, url, e){
   val function = "directFn"
 
   private def assign() = {
@@ -49,12 +42,6 @@ class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView
     assign()
     super.interact(script, timeoutMs)
   }
-}
-
-class SelectorJQueryWrapper(selector: String, wookie:WookieView, url: String, e: PageDoneEvent)
-  extends JQueryWrapper(selector, wookie, url, e){
-  
-  val function = "jQuery"
 }
 
 abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String, val e: PageDoneEvent){
@@ -86,7 +73,6 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   def mouseClick(): JQueryWrapper = {
     triggerEvent("click")
   }
-
 
   def triggerEvent(event: String): JQueryWrapper ={
     interact(s"$function('$escapedSelector').trigger('$event')".toString)

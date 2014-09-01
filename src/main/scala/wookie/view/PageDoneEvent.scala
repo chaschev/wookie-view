@@ -5,6 +5,10 @@ import scala.concurrent.Promise
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
+
+/**
+ * Eventually now two types of page-done event are used: ok & timeout.
+ */
 abstract class PageDoneEvent(val arg: WaitArg) {
   def ok() : Boolean
 }
@@ -18,8 +22,6 @@ case class LoadTimeoutPageDoneEvent(override val arg: WaitArg) extends PageDoneE
 }
 
 
-// redesign: need to provide call back, don't need it outside
-//
 case class OkPageDoneEvent(
   wookieEvent: WookiePageStateChangedEvent, override val arg: WaitArg) extends PageDoneEvent(arg) {
   val ok = true

@@ -50,6 +50,10 @@ case class PageReadyEvent(
        oldLoc: String
  ) extends WookieNavigationEvent(pageLoadedId, newLoc, oldLoc)
 
+/**
+ * This is used to track a download start. Each time the location url is changed, this event is spawned.
+ * Since it is useless most of the time, it is being filtered out in favor of PageReadyEvent.
+ */
 case class LocationChangedEvent(
    override val pageLoadedId: Int,
    newLoc: String,
@@ -183,7 +187,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
         changedLocationsHistory += newLoc
 
-//        before I thought that page ready is not being called when you click on a button to redirect
         val handlers = scanNavRecords(new LocationChangedEvent(random.nextInt(), newLoc, oldLoc))
 
         handlers.foreach(event => {

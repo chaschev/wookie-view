@@ -1,14 +1,18 @@
 h1 Architecture
     h2 Basic Classes
-        p
-            b WaitArg
-            The input containing callbacks to handle the change of the browser state.
-            | The 'change of browser state' is also descibed here. Some points about the WaitArg
-            p Wookie.waitForLocation creates NavigationRecord
-            p NavigationRecord - a record stored in an array. Contains WaitArg and a promise to NavigationDoneEvent  (may contain eventId??)
-            p PageDoneEvent - when browser finishes loading a page (ok, timeout, nok).
-            p NavigationMatcher
-            p WookieView.includeStuffOnPage – a method which includes jQuery and other scripts once the page is done
-            li
-                ul
-            b
+        b WaitArg
+        The input containing callbacks to handle the change of the browser state.
+        | The 'change of browser state' is also descibed here. Some points about the WaitArg
+        p Wookie.waitForLocation creates NavigationRecord
+        p NavigationRecord - a record stored in an array. Contains WaitArg and a promise to NavigationDoneEvent  (may contain eventId??)
+        p PageDoneEvent - when browser finishes loading a page (ok, timeout, nok).
+        p NavigationMatcher
+        p WookieView.scanNavRecords - a method to scan records to find matching page-done handlers & check timeouts
+        p WookieView.includeStuffOnPage – a method which includes jQuery and other scripts once the page is done (including timeout situation).
+        p WookieView.registerScanningTimer - runs a timer to scan records for timeouts.
+        li
+            ul
+        b
+    h2 Important notes
+        p If the page is not yet ready, clicking a button (JS interacton in code) won't work.
+        p (todo?) As there is only one page being loaded at the moment of time, it makes sense to maintain a single NavigationRecord in the wookie.navigationRecords
