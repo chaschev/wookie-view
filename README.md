@@ -24,67 +24,67 @@ Code examples can be found in an [example folder](https://github.com/chaschev/wo
 #### Search Google
 
 ```java
-    $.apply("input[maxlength]", null)
-        .value("wookie-view")
-        .submit();
+$("input[maxlength]")
+    .value("wookie-view")
+    .submit();
 ```
 
 #### Click 'Sign In' button at GitHub
 
 ```java
-    wookie
-        .waitForLocation(new WaitArg("git wookie not logged in")
-        .matchByAddress((s) -> s.contains("/wookie-view"))
-        .whenLoaded(e -> {
-            $.apply("a.button.signin", e).clickLink();
-        }))
+wookie
+    .waitForLocation(new WaitArg("git wookie not logged in")
+    .matchByAddress((s) -> s.contains("/wookie-view"))
+    .whenLoaded(e -> {
+        $.apply("a.button.signin", e).clickLink();
+    }))
 ```
 
 #### Configuring the WookieView
 
 ```java
-  WookieView wookieView = WookieView.newBuilder
-        .useFirebug(false)
-        .useJQuery(true)
-        .createWebView(!DownloadJDK.miniMode)  // WookieView can be hidden
-        .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
-        .build
+WookieView wookieView = WookieView.newBuilder
+    .useFirebug(false)
+    .useJQuery(true)
+    .createWebView(!DownloadJDK.miniMode)  // WookieView can be hidden
+    .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
+    .build()
 ```
 
 #### Follow a link after a Google Search query
    
 ```java
-    // Wait for Google Search results page to load
-    wookie
-        .waitForLocation(new WaitArg("google search results")
-        .matchByAddress((s) -> s.contains("q="))
-        .whenLoaded(e -> {
-            System.out.println("results: " + $.apply("h3.r", e).asResultList());
+// Wait for Google Search results page to load
+wookie
+    .waitForLocation(new WaitArg("google search results")
+    .matchByAddress((s) -> s.contains("q="))
+    .whenLoaded(e -> {
+        System.out.println("results: " + $.apply("h3.r", e).asResultList());
 
-            // find our link in the results list and click it
-            // in Scala the selector would be shorter: $("h3.r a")
-            JQueryWrapper githubLink = $.apply("h3.r a", e).asResultListJava()
-                .stream()
-                .filter((j) -> j.text().contains("chaschev"))
-                .findFirst().get();
+        // find our link in the results list and click it
+        // in Scala the selector would be shorter: $("h3.r a")
+        JQueryWrapper githubLink = $.apply("h3.r a", e).asResultListJava()
+            .stream()
+            .filter((j) -> j.text().contains("chaschev"))
+            .findFirst().get();
 
-            githubLink.clickLink();
-        }));
-      
-    // Search Google
-    $.apply("input[maxlength]", null)
-        .value("wookie-view")
-        .submit();
+        githubLink.clickLink();
+    }));
+  
+// Search Google
+$.apply("input[maxlength]", null)
+    .value("wookie-view")
+    .submit();
 ```
 
 #### Download a file (Scala)
 
 ```scala
-  wookie.waitForDownloadToStart(
-    new LocationMatcher(loc =>
-      loc.contains("download.oracle.com") && loc.contains("?")
-    )
-  ).andThen({ case result =>
-    logger.info(s"download done: $result")
-  })
+wookie.waitForDownloadToStart(
+  new LocationMatcher(loc =>
+    loc.contains("download.oracle.com") && loc.contains("?")
+  )
+).andThen({ case result =>
+  logger.info(s"download done: $result")
+})
 ```
