@@ -574,15 +574,15 @@ class WookieView(builder: WookieBuilder) extends Pane {
             |
             |
             |    script.onload = function() {
-            |      try{
-            |              window.simpleBrowser.jsReady($interactionId, 'url ' + text);
+            |      try {
+            |        window.simpleBrowser.jsReady($interactionId, 'url ' + text);
             |      } catch(e){
             |        alert(e);
             |      }
             |    };
-            |        var head = document.getElementsByTagName('head')[0];
+            |    var head = document.getElementsByTagName('head')[0];
             |
-            |        script.type = 'text/javascript';
+            |    script.type = 'text/javascript';
             |    script.src = text;
             |
             |    head.appendChild(script);
@@ -604,8 +604,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
    * @param jQuerySelector
    * @return
    */
-  def $(jQuerySelector: String, url: String)(implicit e: PageDoneEvent): JQueryWrapper =
-  {
+  def $(jQuerySelector: String, url: String)(implicit e: PageDoneEvent): JQueryWrapper = {
     val sel = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
 
     val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]

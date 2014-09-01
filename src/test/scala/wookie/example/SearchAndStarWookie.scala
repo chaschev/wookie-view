@@ -1,10 +1,9 @@
 package wookie.example
 
-import wookie._
-import wookie.WookieScenario
 import java.util.Properties
 
-import wookie.view.{PageDoneEvent, WhenPageLoaded, WookieView, WaitArg}
+import wookie._
+import wookie.view.{WookieView, PageDoneEvent, WaitArg, WhenPageLoaded}
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -13,10 +12,14 @@ object SearchAndStarWookie {
   var login = ""
   var password = ""
 
-  val defaultPanel = () => {
-    val wookieView = WookieView.newBuilder.useJQuery(true).build
+  val defaultPanel = new PanelSupplier {
+    override def apply(): WookiePanel = {
+      val wookieView = WookieView.newBuilder
+        .useJQuery(true)
+        .build
 
-    WookiePanel.newBuilder(wookieView).build
+      WookiePanel.newBuilder(wookieView).build
+    }
   }
 
   def newPanel: WookiePanel = defaultPanel.apply()
@@ -97,7 +100,7 @@ object SearchAndStarWookie {
             }
           }))
 
-          // submit google request
+          // submit google request and start the scenario
           $("input[maxlength]")(null)
             .value("wookie-view")
             .submit()

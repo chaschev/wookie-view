@@ -8,9 +8,7 @@ import javafx.scene.layout.VBox
 
 import org.slf4j.LoggerFactory
 import wookie.view._
-import wookie.{WookiePanel, WookieSandboxApp, WookieScenario}
-
-import scala.concurrent.ExecutionContext
+import wookie.{PanelSupplier, WookiePanel, WookieSandboxApp, WookieScenario}
 
 case class DownloadResult(file:Option[File], message: String, ok:Boolean){
 
@@ -20,7 +18,7 @@ case class DownloadResult(file:Option[File], message: String, ok:Boolean){
  * @author Andrey Chaschev chaschev@gmail.com
  */
 object DownloadJDK {
-  import ExecutionContext.Implicits.global
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   var login = ""
   var password = ""
@@ -36,19 +34,21 @@ object DownloadJDK {
 
   // current design assumes multiple downloaders are possible
   // this closure is used to create a single download panel
-  val defaultPanelCreator = () => {
-    val wookieView = WookieView.newBuilder
-      .useFirebug(false)
-      .useJQuery(true)
-      .createWebView(!DownloadJDK.miniMode)
-      .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
-      .build
+  val defaultPanelSupplier = new PanelSupplier {
+    override def apply(): WookiePanel = {
+      val wookieView = WookieView.newBuilder
+        .useFirebug(false)
+        .useJQuery(true)
+        .createWebView(!DownloadJDK.miniMode)
+        .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
+        .build
 
-    WookiePanel.newBuilder(wookieView)
-      .userPanel(new VBox(wookieView.progressLabel, wookieView.progressBar))
-      .build
+      WookiePanel.newBuilder(wookieView)
+        .userPanel(new VBox(wookieView.progressLabel, wookieView.progressBar))
+        .build
+    }
+
   }
-
   def main(args: Array[String])
   {
     val app = WookieSandboxApp.start()
@@ -64,7 +64,7 @@ object DownloadJDK {
       new WookieScenario(
         url = Some("http://www.google.com"),
         title = "Downloading JDK " + DownloadJDK.version,
-        panel = defaultPanelCreator,
+        panel = defaultPanelSupplier,
         procedure = (wookiePanel, wookie, $) => {
 
           //this is login form state

@@ -1,6 +1,7 @@
 package wookie.view
 
 import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
+import java.util.{List => JList}
 import javafx.concurrent.Worker.State
 
 import netscape.javascript.JSObject
@@ -8,6 +9,9 @@ import org.apache.commons.lang3.StringEscapeUtils
 
 import scala.collection.mutable
 import scala.util.Random
+
+import scala.collection.JavaConversions._
+
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -100,7 +104,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     this
   }
 
-  def submit():JQueryWrapper = {
+  def submit(): JQueryWrapper = {
     interact(s"submitEnclosingForm($function, '$escapedSelector')")
     this
   }
@@ -206,11 +210,13 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     this
   }
 
-  def asResultList():List[JQueryWrapper] = {
+  def asResultList(): List[JQueryWrapper] = {
     val r = interact(s"$function('$escapedSelector')").asInstanceOf[JSObject]
 
     _jsJQueryToResultList(r)
   }
+
+  def asResultListJava(): JList[JQueryWrapper] = asResultList()
 
   override def toString: String = html()
 }

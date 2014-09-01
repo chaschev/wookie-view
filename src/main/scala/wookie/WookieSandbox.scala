@@ -17,11 +17,15 @@ trait JQuerySupplier {
   def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper
 }
 
+trait PanelSupplier {
+  def apply(): WookiePanel
+}
+
 class WookieScenario(
                      val title: String,
                      val url: Option[String] = None,
 //                     val init: Option[()=>Unit] = None,
-                     val panel: () => WookiePanel,
+                     val panel: PanelSupplier,
                      val procedure: (WookiePanel, WookieView, JQuerySupplier) => Unit){
   def newPanel(): WookiePanel = panel()
 }

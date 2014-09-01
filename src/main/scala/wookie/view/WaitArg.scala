@@ -1,5 +1,8 @@
 package wookie.view
 
+import java.lang.{Boolean => JBoolean}
+import java.util.function.{Function => JFunction}
+
 import scala.concurrent.Promise
 import scala.util.Random
 
@@ -19,7 +22,7 @@ class WaitArg(var name: String = ""){
 
   val eventId: Int = Random.nextInt()  //currently not really used
 
-  var startedAtMs:Long = -1
+  var startedAtMs: Long = -1
   var location: Option[String] = if(name.equals("")) None else Some(name)
 
   private[this] var navigationMatcher:NavigationMatcher = NextPageReadyMatcher.instance
@@ -37,6 +40,9 @@ class WaitArg(var name: String = ""){
 
   def matchByAddress(p: (String) => Boolean): WaitArg =
     withMatcher(new LocationMatcher(p))
+
+  def matchByAddress(p: JFunction[String, JBoolean]): WaitArg =
+    withMatcher(new LocationMatcher(p.apply))
 
   def matchIfPageReady(_location:String): WaitArg = {
     this.navigationMatcher = NextPageReadyMatcher.instance; this
