@@ -34,19 +34,20 @@ import scala.concurrent.{Await, Promise, Future => SFuture}
 import scala.util.{Random, Try}
 
 
-abstract class WookiePageStateChangedEvent{
+abstract class WookiePageStateChangedEvent(val pageLoadedId: Int){
   def newLoc: String
 }
 
-case class WookieNavigationEvent (
-    newLoc: String, 
-    oldLoc: String, 
+case class WookieNavigationEvent(override val pageLoadedId: Int,
+    newLoc: String,
+    oldLoc: String,
     isPageReadyEvent: Boolean
-) extends WookiePageStateChangedEvent
+) extends WookiePageStateChangedEvent(pageLoadedId)
 
 case class TimerPageStateEvent (
+  override val pageLoadedId: Int,
   newLoc: String
-) extends WookiePageStateChangedEvent
+) extends WookiePageStateChangedEvent(pageLoadedId)
 
 case class DownloadResult(
    file: Option[File], 
@@ -103,19 +104,19 @@ class WookieView(builder: WookieBuilder) extends Pane {
   val progressLabel = new Label("")
   val progressBar = new ProgressBar(0)
 
-  protected val loadedLocationsHistory = mutable.MutableList[String]()
+  protected val changedLocationsHistory = mutable.MutableList[String]()
   protected val queriedLocationsHistory = mutable.MutableList[String]()
-  protected val navigationPredicates: JSet[NavigationRecord] = Sets.newConcurrentHashSet()
+  protected val navigationRecords: JSet[NavigationRecord] = Sets.newConcurrentHashSet()
 
   protected val scheduler = Executors.newScheduledThreadPool(4)
 
-  case class PageOnLoadHandler(eventId: Int, latch: CountDownLatch, handler: Option[() => Unit]) {
+  case class PageOnLoadHandler(interactionId: Int, latch: CountDownLatch, handler: Option[() => Unit]) {
 
   }
 
   def getHistory: JIterable[String] = webEngine.getHistory.getEntries.map(x => x.getUrl)
 
-  private final val jsHandlers = new ConcurrentHashMap[Integer, PageOnLoadHandler]
+  private final val jsInteractionIdsToHandlers = new ConcurrentHashMap[Integer, PageOnLoadHandler]
 
   {
     if (webView.isDefined) {
@@ -139,11 +140,13 @@ class WookieView(builder: WookieBuilder) extends Pane {
           //todo: get oldLoc from history
 
           logger.info(s"page ready: $currentLocation")
-          
-          includeStuffOnPage(random.nextInt(), currentLocation, Some(() => {
+
+          val pageLoadedId = random.nextInt()
+
+          includeStuffOnPage(pageLoadedId, currentLocation, Some(() => {
             logger.info(s"stuff loaded: $currentLocation")
 
-            val handlers = scanHandlers(new WookieNavigationEvent(currentLocation, "", true))
+            val handlers = scanHandlers(new WookieNavigationEvent(pageLoadedId, currentLocation, "", true))
 
             logger.debug(s"stateProperty (pageReady): found ${handlers.size} handlers, processing....")
 
@@ -167,20 +170,24 @@ class WookieView(builder: WookieBuilder) extends Pane {
       {
         logger.info(s"location changed to $newLoc")
 
-        loadedLocationsHistory += newLoc
+        changedLocationsHistory += newLoc
         
-        val handlers = scanHandlers(new WookieNavigationEvent(newLoc, oldLoc, false))
-
-        handlers.foreach(event => {
-          event.arg.handleIfDefined(event)
-        })
+//        val handlers = scanHandlers(new WookieNavigationEvent(random.nextInt(), newLoc, oldLoc, false))
+//
+//        handlers.foreach(event => {
+//          event.arg.handleIfDefined(event)
+//        })
       }
     })
     
     scheduler.scheduleAtFixedRate(new Runnable {
       override def run(): Unit = {
         logger.debug("scanning handlers...")
-        scanHandlers(new TimerPageStateEvent(queriedLocationsHistory.last))
+        val handlers = scanHandlers(new TimerPageStateEvent(random.nextInt(), queriedLocationsHistory.last))
+
+        handlers.foreach(event => {
+          event.arg.handleIfDefined(event)
+        })
       }
     }, 50, 50, TimeUnit.MILLISECONDS)
   }
@@ -193,9 +200,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
       .withMatcher(matcher)
       .isPageReadyEvent(false)
       .whenLoaded(new WhenPageLoaded {
-      override def apply()(implicit event: NavigationEvent): Unit = {
+      override def apply()(implicit event: PageDoneEvent): Unit = {
         //copy-pasted magic
-        val navEvent = event.asInstanceOf[OkNavigationEvent]
+        val navEvent = event.asInstanceOf[OkPageDoneEvent]
 
         val uri = navEvent.wookieEvent.newLoc
 
@@ -287,10 +294,12 @@ class WookieView(builder: WookieBuilder) extends Pane {
   }
 
 
-  protected def scanHandlers(e: WookiePageStateChangedEvent): mutable.MutableList[NavigationEvent] = {
-    val it = navigationPredicates.iterator()
+  protected def scanHandlers(e: WookiePageStateChangedEvent): mutable.MutableList[PageDoneEvent] = {
+    logger.debug(s"scanning ${navigationRecords.size()} records...")
 
-    val matchingEntries = mutable.MutableList[NavigationEvent]()
+    val it = navigationRecords.iterator()
+
+    val matchingEntries = mutable.MutableList[PageDoneEvent]()
     
     while(it.hasNext){
       val r = it.next()
@@ -298,14 +307,14 @@ class WookieView(builder: WookieBuilder) extends Pane {
       val isDue = r.arg.isDue
 
       if(isDue) {
-        val event = new LoadTimeoutNavigationEvent(r.arg)
+        val event = new LoadTimeoutPageDoneEvent(r.arg)
 
         r.promise.complete(Try(event))
         it.remove()
         
         matchingEntries += event
 
-        logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationPredicates.size()}")
+        logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationRecords.size()}")
       }else{
         e match {
           // predicates work only for non-timer events
@@ -314,14 +323,14 @@ class WookieView(builder: WookieBuilder) extends Pane {
             val eventTypeOk = r.arg.isPageReadyEvent == locEvent.isPageReadyEvent
 
             if (eventTypeOk && r.arg.matcher.matches(r, locEvent)) {
-              val event = new OkNavigationEvent(e, r.arg)
+              val event = new OkPageDoneEvent(e, r.arg)
 
               r.promise.complete(Try(event))
               it.remove()
 
               matchingEntries += event
 
-              logger.info(s"removed ok entry: ${r.arg}, size: ${navigationPredicates.size()}")
+              logger.info(s"removed ok entry: ${r.arg}, new size: ${navigationRecords.size()}")
             }
           case _ =>
             false
@@ -336,10 +345,10 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def getEngine: WebEngine = webEngine
 
-  private[wookie] def jsReady(eventId: Int, from: String) {
-    logger.info(s"event $eventId arrived from $from")
+  private[wookie] def jsReady(interactionId: Int, from: String) {
+    logger.info(s"event $interactionId arrived from $from")
 
-    val jsHandler = jsHandlers.get(eventId)
+    val jsHandler = jsInteractionIdsToHandlers.get(interactionId)
 
     if (jsHandler != null) {
       jsHandler.latch.countDown()
@@ -353,7 +362,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       }
     }
 
-    logger.debug(s"leaving from jsReady, eventId: $eventId")
+    logger.debug(s"leaving from jsReady, interactionId: $interactionId")
   }
 
 
@@ -363,7 +372,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
   def waitForLocation(arg: WaitArg): NavigationRecord = {
     val record: NavigationRecord = arg.startedAtMs(System.currentTimeMillis()).toNavigationRecord
 
-    navigationPredicates.add(record)
+    navigationRecords.add(record)
 
     if(arg.async) return record
 
@@ -376,10 +385,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def load(location: String): WookieView = load(location, None)
 
-  def load(location: String, r: Runnable): WookieView =
-  {
+  def load(location: String, r: Runnable): WookieView = {
     load(location, Some(new WhenPageLoaded {
-      override def apply()(implicit e: NavigationEvent): Unit = {
+      override def apply()(implicit e: PageDoneEvent): Unit = {
         r.run()
       }
     }))
@@ -421,9 +429,9 @@ class WookieView(builder: WookieBuilder) extends Pane {
   /**
    * Each time when the page is loaded we need to include complementary stuff like jQuery.
    */
-  private[wookie] def includeStuffOnPage(eventId: Int, location: String, onLoad: Option[() => Unit]): SFuture[Boolean] =
+  private[wookie] def includeStuffOnPage(interactionId: Int, location: String, onLoad: Option[() => Unit]): SFuture[Boolean] =
   {
-    logger.debug(s"including stuff on page for eventId $eventId, location $location")
+    logger.debug(s"including stuff on page for interactionId $interactionId, location $location")
     try {
       val s = webEngine.executeScript(s"'' + window.__wookiePageInitialized").asInstanceOf[String]
       if (s == "true") {
@@ -455,16 +463,16 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     val latch = new CountDownLatch(latchCount)
 
-    val handler = new PageOnLoadHandler(eventId, latch, onLoad)
+    val handler = new PageOnLoadHandler(interactionId, latch, onLoad)
 
-    if (jsHandlers.putIfAbsent(eventId, handler) != null) {
+    if (jsInteractionIdsToHandlers.putIfAbsent(interactionId, handler) != null) {
       return SFuture successful true
     }
 
     if (onLoad.isDefined) {
-      logger.info(s"registered event: $eventId for location $location")
+      logger.info(s"registered event: $interactionId for location $location")
 
-      jsHandlers.put(eventId, handler)
+      jsInteractionIdsToHandlers.put(interactionId, handler)
     }
 
     if (options.useFirebug) {
@@ -472,16 +480,16 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }
 
     if (urls.nonEmpty) {
-      insertJS(eventId, new JSScript(urls.toArray, None))
+      insertJavaScripts(interactionId, new JSScript(urls.toArray, None))
     }
 
     if (options.includeJsScript.isDefined) {
       //callback is not needed actually
-      insertJS(eventId, new JSScript(Array.empty, options.includeJsScript))
+      insertJavaScripts(interactionId, new JSScript(Array.empty, options.includeJsScript))
     }
 
     //callback is not needed actually
-    initClicksJs(eventId)
+    initClicksJs(interactionId)
 
     // todo is this all a single thread?
     logger.debug("setting window.__wookiePageInitialized = true;")
@@ -489,17 +497,17 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     // when there are no urls and no scripts, latch is 0
     if(latchCount == 0){
-      jsReady(eventId, "no-need-to-wait")
+      jsReady(interactionId, "no-need-to-wait")
     }
 
     SFuture successful false
   }
 
-  def initClicksJs(eventId: Int)
+  def initClicksJs(interactionId: Int)
   {
     val wookieJs = io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/wookie.js")).mkString
 
-    insertJS(eventId, new JSScript(Array.empty, Some(wookieJs), Some("wookie.js")))
+    insertJavaScripts(interactionId, new JSScript(Array.empty, Some(wookieJs), Some("wookie.js")))
   }
 
   case class JSScript(urls: Array[String], text: Option[String], name:Option[String] = None) {
@@ -510,12 +518,12 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }
   }
 
-  protected def insertJQuery(eventId: Int, version: String)
+  protected def insertJQuery(interactionId: Int, version: String)
   {
     if (!isJQueryAvailableAtPage) {
-      insertJS(eventId, new JSScript(Array[String](s"https://ajax.googleapis.com/ajax/libs/jquery/$version/jquery.min.js"), None))
+      insertJavaScripts(interactionId, new JSScript(Array[String](s"https://ajax.googleapis.com/ajax/libs/jquery/$version/jquery.min.js"), None))
     } else {
-      jsReady(eventId, "jQuery already loaded")
+      jsReady(interactionId, "jQuery already loaded")
     }
   }
 
@@ -525,7 +533,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
     !webEngine.executeScript(s"typeof jQuery == 'undefined'").asInstanceOf[Boolean]
   }
 
-  protected def insertJS(eventId: Int, jsScript: JSScript)
+  protected def insertJavaScripts(interactionId: Int, jsScript: JSScript)
   {
     val jsWindow: JSObject = webEngine.executeScript("window").asInstanceOf[JSObject]
 
@@ -544,7 +552,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
         s"    \n" +
         s"    script.onload = function() {\n" +
         s"      try{\n      " +
-        s"        window.simpleBrowser.jsReady($eventId, 'url ' + text);\n" +
+        s"        window.simpleBrowser.jsReady($interactionId, 'url ' + text);\n" +
         s"      } catch(e){\n" +
         s"        alert(e);\n" +
         s"      }\n" +
@@ -562,7 +570,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       webEngine.executeScript(script)
     } else {
       webEngine.executeScript(jsScript.text.get + ";\n" +
-        s"window.simpleBrowser.jsReady($eventId, 'script');")
+        s"window.simpleBrowser.jsReady($interactionId, 'script');")
     }
   }
 
@@ -590,7 +598,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
    * @param jQuerySelector
    * @return
    */
-  def $(jQuerySelector: String, url: String)(implicit e: NavigationEvent): JQueryWrapper =
+  def $(jQuerySelector: String, url: String)(implicit e: PageDoneEvent): JQueryWrapper =
   {
     val sel = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
 

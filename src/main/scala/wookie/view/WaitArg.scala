@@ -4,7 +4,7 @@ import scala.concurrent.Promise
 import scala.util.Random
 
 trait WhenPageLoaded {
-  def apply()(implicit e: NavigationEvent)
+  def apply()(implicit e: PageDoneEvent)
 }
 
 /**
@@ -12,12 +12,12 @@ trait WhenPageLoaded {
  */
 class WaitArg(var name: String = ""){
   //  var predicate:Option[((String, String, NavArg) => Boolean)] = None
-  var timeoutMs: Option[Int] = Some(10000)
+  var timeoutMs: Option[Int] = Some(30000)
   private[this] var handler: Option[WhenPageLoaded] = None
   var async: Boolean = true
   var isPageReadyEvent:Boolean = true
 
-  val eventId:Int = Random.nextInt()  //currently not really used
+  val eventId: Int = Random.nextInt()  //currently not really used
 
   var startedAtMs:Long = -1
   var location:Option[String] = if(name.equals("")) None else Some(name)
@@ -35,7 +35,7 @@ class WaitArg(var name: String = ""){
     navigationMatcher = matcher; this
   }
 
-  def matchByLocation(p: (String) => Boolean): WaitArg =
+  def matchByAddress(p: (String) => Boolean): WaitArg =
     withMatcher(new LocationMatcher(p))
 
   def matchIfPageReady(_location:String): WaitArg = {
@@ -53,7 +53,7 @@ class WaitArg(var name: String = ""){
 
   def isPageReadyEvent(isPageReady: Boolean): WaitArg = {this.isPageReadyEvent = isPageReady; this}
 
-  protected[wookie] def handleIfDefined(e: NavigationEvent) = if(this.handler.isDefined) this.handler.get.apply()(e)
+  protected[wookie] def handleIfDefined(e: PageDoneEvent) = if(this.handler.isDefined) this.handler.get.apply()(e)
 
   //todo make package local
   protected[wookie] def startedAtMs(t: Long): WaitArg = {this.startedAtMs = t; this}
@@ -66,7 +66,7 @@ class WaitArg(var name: String = ""){
     }
 
   def toNavigationRecord:NavigationRecord = {
-    new NavigationRecord(this, Promise[NavigationEvent]())
+    new NavigationRecord(this, Promise[PageDoneEvent]())
   }
 
   override def toString: String = {

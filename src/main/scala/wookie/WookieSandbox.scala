@@ -13,7 +13,8 @@ import org.slf4j.LoggerFactory
 import wookie.view._
 
 trait JQuerySupplier {
-  def apply(selector: String)(implicit e: NavigationEvent): JQueryWrapper
+  //todo move implicit
+  def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper
 }
 
 class WookieScenario(
@@ -101,17 +102,17 @@ class WookieSandboxApp extends Application {
 
         if(ws.url.isDefined) {
           wookie.load(ws.url.get, new WhenPageLoaded {
-            override def apply()(implicit e: NavigationEvent): Unit = {
+            override def apply()(implicit e: PageDoneEvent): Unit = {
               ws.procedure(panel, wookie, new JQuerySupplier {
-                override def apply(selector: String)(implicit e: NavigationEvent): JQueryWrapper =
+                override def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper =
                   wookie.$(selector, ws.url.get)
               })
             }
           })
         } else {
           ws.procedure(panel, wookie, new JQuerySupplier {
-            override def apply(selector: String)(implicit e: NavigationEvent): JQueryWrapper =
-              wookie.$(selector, e.asInstanceOf[OkNavigationEvent].wookieEvent.newLoc)
+            override def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper =
+              wookie.$(selector, e.asInstanceOf[OkPageDoneEvent].wookieEvent.newLoc)
           })
         }
       }

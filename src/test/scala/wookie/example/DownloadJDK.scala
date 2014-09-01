@@ -70,9 +70,9 @@ object DownloadJDK {
           //this is login form state
           wookie.waitForLocation(new WaitArg()
             .timeoutNone()
-            .matchByLocation(_.contains("signon.jsp"))
+            .matchByAddress(_.contains("signon.jsp"))
             .whenLoaded(new WhenPageLoaded {
-            override def apply()(implicit e: NavigationEvent): Unit = {
+            override def apply()(implicit e: PageDoneEvent): Unit = {
               logger.info(s"signon form: ${$("#sso_username")}")
 
               $("#sso_username").value(login)
@@ -164,7 +164,7 @@ object DownloadJDK {
   private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String, whenDone: (Boolean) => Unit) =
   {
     browser.load(archiveUrl, new WhenPageLoaded {
-      override def apply()(implicit e: NavigationEvent): Unit = {
+      override def apply()(implicit e: PageDoneEvent): Unit = {
         try {
           val aBoolean = browser.getEngine.executeScript("downloadIfFound('" + DownloadJDK.version + "', true, 'linux');").asInstanceOf[Boolean]
 

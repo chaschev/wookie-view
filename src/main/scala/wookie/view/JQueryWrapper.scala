@@ -1,6 +1,7 @@
 package wookie.view
 
-import java.util.concurrent.{TimeoutException, TimeUnit, CountDownLatch}
+import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
+import javafx.concurrent.Worker.State
 
 import netscape.javascript.JSObject
 import org.apache.commons.lang3.StringEscapeUtils
@@ -14,21 +15,21 @@ import scala.util.Random
 /**
  * An abstract wrapper for i.e. find in "$(sel).find()" or array items: $($(sel)[3])
  */
-abstract class CompositionJQueryWrapper(selector: String, wookie:WookieView, url: String, e: NavigationEvent) extends JQueryWrapper(selector, wookie, url, e){
+abstract class CompositionJQueryWrapper(selector: String, wookie:WookieView, url: String, e: PageDoneEvent) extends JQueryWrapper(selector, wookie, url, e){
 
 }
 
-class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView, url: String, e: NavigationEvent) extends CompositionJQueryWrapper(selector, wookie, url, e){
+class ArrayItemJQueryWrapper(selector:String, index:Int, wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper(selector, wookie, url, e){
   val function = s"newArrayFn($index)"
 }
 
-class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView, url: String, e: NavigationEvent) extends CompositionJQueryWrapper(selector, wookie, url, e: NavigationEvent){
+class FindJQueryWrapper(selector:String, findSelector:String,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper(selector, wookie, url, e: PageDoneEvent){
   //  private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
   private final val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
   val function = s"newFindFn('$escapedSelector', '$escapedFindSelector')"
 }
 
-class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView, url: String, e: NavigationEvent) extends CompositionJQueryWrapper("", wookie, url, e){
+class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper("", wookie, url, e){
   val function = "directFn"
 
   private def assign() = {
@@ -50,13 +51,13 @@ class DirectWrapper(isDom:Boolean = false, jsObject:JSObject,  wookie:WookieView
   }
 }
 
-class SelectorJQueryWrapper(selector: String, wookie:WookieView, url: String, e: NavigationEvent)
+class SelectorJQueryWrapper(selector: String, wookie:WookieView, url: String, e: PageDoneEvent)
   extends JQueryWrapper(selector, wookie, url, e){
   
   val function = "jQuery"
 }
 
-abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String, val e: NavigationEvent){
+abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String, val e: PageDoneEvent){
   val function: String
 
   val escapedSelector = StringEscapeUtils.escapeEcmaScript(selector)
@@ -168,16 +169,20 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   def interact(script: String, timeoutMs: Long = 5000): AnyRef = {
     WookieView.logger.debug(s"interact: $script, url=${this.url}, event=$e", new Exception)
 
-    val eventId = Random.nextInt()
+    if(wookie.getEngine.getLoadWorker.getState == State.SUCCEEDED) {
+      WookieView.logger.warn(s"non-succeeded state: ${wookie.getEngine.getLoadWorker.getState} for interact script $script, interactionId=TODO")
+    }
+
+    val interactionId = Random.nextInt()
 
     val latch = new CountDownLatch(1)
 
     var r: AnyRef = null
 
-    // todo: remove this line when there is no
+    // todo: remove this line when there is no failure
     val url = wookie.getEngine.getDocument.getDocumentURI
 
-    wookie.includeStuffOnPage(eventId, url, Some(() => {
+    wookie.includeStuffOnPage(interactionId, url, Some(() => {
       WookieView.logger.debug(s"executing $script")
       r = wookie.getEngine.executeScript(script)
       latch.countDown()

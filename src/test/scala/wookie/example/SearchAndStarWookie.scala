@@ -4,7 +4,7 @@ import wookie._
 import wookie.WookieScenario
 import java.util.Properties
 
-import wookie.view.{NavigationEvent, WhenPageLoaded, WookieView, WaitArg}
+import wookie.view.{PageDoneEvent, WhenPageLoaded, WookieView, WaitArg}
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -41,9 +41,9 @@ object SearchAndStarWookie {
 
           // google search result state
           wookie.waitForLocation(new WaitArg("google search results")
-            .matchByLocation(_.contains("q="))
+            .matchByAddress(_.contains("q="))
             .whenLoaded(new WhenPageLoaded {
-            override def apply()(implicit e: NavigationEvent): Unit = {
+            override def apply()(implicit e: PageDoneEvent): Unit = {
 
               println("results: " + $("h3.r").asResultList())
 
@@ -57,38 +57,37 @@ object SearchAndStarWookie {
           // this matcher is the same as one of the following
           // there is no problem, because matchers are removed when they are hit
           // waits for wookie-view page to load and clicks signin button
-          wookie.waitForLocation(new WaitArg("git wookie not logged in")
-            .matchByLocation(_.contains("/wookie-view"))
+          wookie
+            .waitForLocation(new WaitArg("git wookie not logged in")
+            .matchByAddress(_.contains("/wookie-view"))
             .whenLoaded(new WhenPageLoaded {
-            override def apply()(implicit e: NavigationEvent): Unit = {
-              $("a.button.signin").clickLink()
-            }
-          })
-          )
+              override def apply()(implicit e: PageDoneEvent): Unit = {
+                $("a.button.signin").clickLink()
+              }
+          }))
 
           // login form
           wookie.waitForLocation(new WaitArg("git login")
-            .matchByLocation(_.contains("github.com/login"))
+            .matchByAddress(_.contains("github.com/login"))
             .whenLoaded(new WhenPageLoaded {
-            override def apply()(implicit e: NavigationEvent): Unit = {
+            override def apply()(implicit e: PageDoneEvent): Unit = {
 
               // github.com/wookie-view, logged in state
               // add this state before submitting the form
               wookie.waitForLocation(new WaitArg("wookie logged in")
-                .matchByLocation(_.contains("/wookie-view"))
+                .matchByAddress(_.contains("/wookie-view"))
                 .whenLoaded(new WhenPageLoaded {
-                override def apply()(implicit e: NavigationEvent): Unit = {
+                  override def apply()(implicit e: PageDoneEvent): Unit = {
+                    //click 'star' button
+                    val starButton = $(".star-button:visible")
 
-                  //click 'star' button
-                  val starButton = $(".star-button:visible")
-
-                  if(starButton.text().contains("Star")) {
-                    starButton.mouseClick()
-                    println("Now the star will shine!")
-                  } else {
-                    println("Invoke me under my stars!")
+                    if(starButton.text().contains("Star")) {
+                      starButton.mouseClick()
+                      println("Now the star will shine!")
+                    } else {
+                      println("Invoke me under my stars!")
+                    }
                   }
-                }
               }))
 
               // fill login data and submit the form

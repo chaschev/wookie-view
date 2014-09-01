@@ -1,6 +1,6 @@
 package wookie
 
-import wookie.view.{WhenPageLoaded, NavigationEvent, WookieView}
+import wookie.view.{WhenPageLoaded, PageDoneEvent, WookieView}
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -19,7 +19,7 @@ object Test {
 
     browser.load("http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html",
       new WhenPageLoaded {
-        override def apply()(implicit e: NavigationEvent): Unit = {
+        override def apply()(implicit e: PageDoneEvent): Unit = {
           val jQuery = "\"a[name='agreementjdk-7u51-oth-JPR']\""
           browser.click(jQuery)
         }

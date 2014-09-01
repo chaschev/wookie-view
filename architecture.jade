@@ -1,0 +1,14 @@
+h1 Architecture
+    h2 Basic Classes
+        p
+            b WaitArg
+            The input containing callbacks to handle the change of the browser state.
+            | The 'change of browser state' is also descibed here. Some points about the WaitArg
+            p Wookie.waitForLocation creates NavigationRecord
+            p NavigationRecord - a record stored in an array. Contains WaitArg and a promise to NavigationDoneEvent  (may contain eventId??)
+            p PageDoneEvent - when browser finishes loading a page (ok, timeout, nok).
+            p NavigationMatcher
+            p WookieView.includeStuffOnPage – a method which includes jQuery and other scripts once the page is done
+            li
+                ul
+            b
