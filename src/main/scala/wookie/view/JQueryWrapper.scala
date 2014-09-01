@@ -167,10 +167,15 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   }
 
   def interact(script: String, timeoutMs: Long = 5000): AnyRef = {
-    WookieView.logger.debug(s"interact: $script, url=${this.url}, event=$e", new Exception)
+    WookieView.logger.debug(s"interact: $script, url=${this.url}, event=$e, " +
+      s"currentDocUri: ${wookie.getCurrentDocUri}")
 
-    if(wookie.getEngine.getLoadWorker.getState == State.SUCCEEDED) {
-      WookieView.logger.warn(s"non-succeeded state: ${wookie.getEngine.getLoadWorker.getState} for interact script $script, interactionId=TODO")
+    if(e.isInstanceOf[LoadTimeoutPageDoneEvent]) {
+      WookieView.logger.warn(s"warning - interaction is called for timeout event! The result might not be successful!")
+    }
+
+    if(wookie.getEngine.getLoadWorker.getState != State.SUCCEEDED) {
+      WookieView.logger.warn(s"warning - interaction is called in non-succeeded state: ${wookie.getEngine.getLoadWorker.getState} for interact script $script, interactionId=TODO")
     }
 
     val interactionId = Random.nextInt()

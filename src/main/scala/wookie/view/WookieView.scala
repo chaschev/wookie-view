@@ -192,6 +192,13 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }, 50, 50, TimeUnit.MILLISECONDS)
   }
 
+  def getCurrentDocUri: Option[String] = {
+    if(webEngine.getDocument == null)
+      None
+    else
+      Option(webEngine.getDocument.getDocumentURI)
+  }
+
   def waitForDownloadToStart(matcher: NavigationMatcher): SFuture[DownloadResult] = {
     val downloadPromise = Promise[DownloadResult]()
 
@@ -314,7 +321,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
         
         matchingEntries += event
 
-        logger.info(s"removed expired wait entry: ${r.arg}, size: ${navigationRecords.size()}")
+        logger.info(s"timed out after ${r.arg.timeoutMs}ms, removing expired wait entry: ${r.arg}, size: ${navigationRecords.size()}")
       }else{
         e match {
           // predicates work only for non-timer events
