@@ -11,7 +11,7 @@ WookieView allows you to automatize web browsing – i.e. to search with Google 
 * File downloads
 * Scala & Java 8 support
 
-## How to Open in IDE
+## How to open this project in IDE
 
 To open a project in your IDE, you might import it as a Maven project.
 
