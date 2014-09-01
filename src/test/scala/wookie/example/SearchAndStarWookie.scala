@@ -3,7 +3,7 @@ package wookie.example
 import java.util.Properties
 
 import wookie._
-import wookie.view.{WookieView, PageDoneEvent, WaitArg, WhenPageLoaded}
+import wookie.view.{PageDoneEvent, WaitArg, WhenPageLoaded, WookieView}
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -30,7 +30,14 @@ object SearchAndStarWookie {
 
     val props = new Properties()
 
-    props.load(getClass.getResourceAsStream("/auth.properties"))
+    val stream = getClass.getResourceAsStream("/auth.properties")
+
+    if (stream == null) {
+      println("To run this demo, copy auth.properties.copy into auth.properties and fill in your GitHub auth data.")
+      System.exit(-1)
+    }
+
+    props.load(stream)
 
     login = props.getProperty("git.login")
     password = props.getProperty("git.password")

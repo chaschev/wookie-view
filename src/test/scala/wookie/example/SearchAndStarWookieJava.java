@@ -1,15 +1,12 @@
 package wookie.example;
 
-
-import scala.Option;
-import wookie.JQuerySupplier;
 import wookie.WookiePanel;
 import wookie.WookieSandboxApp;
 import wookie.WookieSandboxApp$;
 import wookie.view.*;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.io.InputStream;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -22,7 +19,14 @@ public class SearchAndStarWookieJava {
 
         Properties props = new Properties();
 
-        props.load(SearchAndStarWookieJava.class.getResourceAsStream("/auth.properties"));
+        InputStream stream = SearchAndStarWookieJava.class.getResourceAsStream("/auth.properties");
+
+        if(stream == null){
+            System.out.println("To run this demo, copy auth.properties.copy into auth.properties and fill in your GitHub auth data.");
+            System.exit(-1);
+        }
+
+        props.load(stream);
 
         login = props.getProperty("git.login");
         password = props.getProperty("git.password");
@@ -33,14 +37,15 @@ public class SearchAndStarWookieJava {
                 Optional.of("http://www.google.com"),
                 () -> {
                     WookieView wookieView = WookieView$.MODULE$.newBuilder()
-                            .useJQuery(true)
-                            .build();
+                        .useJQuery(true)
+                        .build();
 
                     return WookiePanel.newBuilder(wookieView).build();
                 },
                 (wookiePanel, wookie, $) -> {
                     // google search result state
-                    wookie.waitForLocation(new WaitArg("google search results")
+                    wookie
+                        .waitForLocation(new WaitArg("google search results")
                         .matchByAddress((s) -> s.contains("q="))
                         .whenLoaded(e -> {
                             System.out.println("results: " + $.apply("h3.r", e).asResultList());
