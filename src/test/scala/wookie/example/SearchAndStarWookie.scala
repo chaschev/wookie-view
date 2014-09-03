@@ -60,7 +60,7 @@ object SearchAndStarWookie {
               //find our link in the results list and click it
               val githubLink = $("h3.r a").asResultList().find(_.text().contains("chaschev"))
 
-              githubLink.get.clickLink()
+              githubLink.get.followLink()
             }
           }))
 
@@ -72,7 +72,7 @@ object SearchAndStarWookie {
             .matchByAddress(_.contains("/wookie-view"))
             .whenLoaded(new WhenPageLoaded {
               override def apply()(implicit e: PageDoneEvent): Unit = {
-                $("a.button.signin").clickLink()
+                $("a.button.signin").followLink()
               }
           }))
 
@@ -108,7 +108,7 @@ object SearchAndStarWookie {
           }))
 
           // submit google request and start the scenario
-          $("input[maxlength]")(null)
+          $("input[maxlength]")
             .value("wookie-view")
             .submit()
         }))

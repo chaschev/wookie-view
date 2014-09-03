@@ -12,23 +12,30 @@ import chaschev.util.Exceptions
 import org.slf4j.LoggerFactory
 import wookie.view._
 
-trait JQuerySupplier {
-  //todo move implicit
-  def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper
+abstract class JQuerySupplier {
+  private var event: Option[PageDoneEvent] = None
+
+  def getEvent: PageDoneEvent = {
+    if(!event.isDefined) {
+      throw new IllegalStateException("event is not present")
+    }
+
+    event.get
+  }
+
+  def setEvent(event: PageDoneEvent): this.type = {
+    this.event = Some(event)
+    this
+  }
+
+  def apply(selector: String): JQueryWrapper
 }
 
 trait PanelSupplier {
   def apply(): WookiePanel
 }
 
-class WookieScenario(
-                     val title: String,
-                     val url: Option[String] = None,
-//                     val init: Option[()=>Unit] = None,
-                     val panel: PanelSupplier,
-                     val procedure: (WookiePanel, WookieView, JQuerySupplier) => Unit){
-  def newPanel(): WookiePanel = panel()
-}
+
 
 object WookieSandboxApp {
   final val logger = LoggerFactory.getLogger(WookieSandboxApp.getClass)
@@ -107,17 +114,12 @@ class WookieSandboxApp extends Application {
         if(ws.url.isDefined) {
           wookie.load(ws.url.get, new WhenPageLoaded {
             override def apply()(implicit e: PageDoneEvent): Unit = {
-              ws.procedure(panel, wookie, new JQuerySupplier {
-                override def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper =
-                  wookie.$(selector, ws.url.get)
-              })
+
+              ws.procedure(panel, wookie, wookie.createJSupplier(Some(ws.url.get), Some(e)))
             }
           })
         } else {
-          ws.procedure(panel, wookie, new JQuerySupplier {
-            override def apply(selector: String)(implicit e: PageDoneEvent): JQueryWrapper =
-              wookie.$(selector, e.asInstanceOf[OkPageDoneEvent].wookieEvent.newLoc)
-          })
+          ws.procedure(panel, wookie, wookie.createJSupplier(None, None))
         }
       }
     })

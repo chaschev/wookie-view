@@ -1,5 +1,6 @@
 package wookie.example;
 
+import scala.Option;
 import wookie.WookiePanel;
 import wookie.WookieSandboxApp;
 import wookie.WookieSandboxApp$;
@@ -46,19 +47,19 @@ public class SearchAndStarWookieJava {
                     // google search result state
                     wookie
                         .waitForLocation(new WaitArg("google search results")
-                        .matchByAddress((s) -> s.contains("q="))
-                        .whenLoaded(e -> {
-                            System.out.println("results: " + $.apply("h3.r", e).asResultList());
+                            .matchByAddress((s) -> s.contains("q="))
+                            .whenLoaded(e -> {
+                                    System.out.println("results: " + $.apply("h3.r").asResultList());
 
-                            //find our link in the results list and click it
-                            JQueryWrapper githubLink = $.apply("h3.r a", e).asResultListJava()
-                                .stream()
-                                .filter((j) -> j.text().contains("chaschev"))
-                                .findFirst().get();
+                                    //find our link in the results list and click it
+                                    JQueryWrapper githubLink = $.apply("h3.r a").asResultListJava()
+                                        .stream()
+                                        .filter((j) -> j.text().contains("chaschev"))
+                                        .findFirst().get();
 
-                            githubLink.clickLink();
-                        }
-                        ));
+                                    githubLink.followLink(Option.empty());
+                                }
+                            ));
 
                     // this matcher is the same as one of the following
                     // there is no problem, because matchers are removed when they are hit
@@ -67,7 +68,7 @@ public class SearchAndStarWookieJava {
                         .waitForLocation(new WaitArg("git wookie not logged in")
                         .matchByAddress((s) -> s.contains("/wookie-view"))
                         .whenLoaded(e -> {
-                            $.apply("a.button.signin", e).clickLink();
+                            $.apply("a.button.signin").followLink(Option.empty());
                         }));
 
                     // login form
@@ -80,27 +81,27 @@ public class SearchAndStarWookieJava {
                                 .matchByAddress((s) -> s.contains("/wookie-view"))
                                 .whenLoaded(e2 -> {
                                     //click 'star' button
-                                    JQueryWrapper starButton = $.apply(".star-button:visible", e2);
+                                    JQueryWrapper starButton = $.apply(".star-button:visible");
 
                                     if (starButton.text().contains("Star")) {
-                                        starButton.mouseClick();
+                                        starButton.mouseClick(Option.empty());
                                         System.out.println("Now the star will shine!");
                                     } else {
                                         System.out.println("Invoke me under my stars!");
                                     }
                                 }));
                             // fill login data and submit the form
-                            $.apply("#login_field", e).value(login);
-                            $.apply("#password", e).value(password)
-                                    .submit();
+                            $.apply("#login_field").value(login);
+                            $.apply("#password").value(password)
+                                    .submit(Option.empty());
 
                         }));
 
 
                     // submit google request and start the scenario
-                $.apply("input[maxlength]", null)
+                $.apply("input[maxlength]")
                         .value("wookie-view")
-                        .submit();
+                        .submit(Option.empty());
                 }
             ));
     }

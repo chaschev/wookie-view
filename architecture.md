@@ -10,11 +10,32 @@
 *WookieView.scanNavRecords* - a method to scan records to find matching page-done handlers & check timeouts
 *WookieView.includeStuffOnPage* – a method which includes jQuery and other scripts once the page is done (including timeout situation).
 *WookieView.registerScanningTimer* - runs a timer to scan records for timeouts.
-        li
-            ul
-        b
+
 ## Important notes
 
-If the page is not yet ready, clicking a button (JS interacton in code) won't work.
+* If the page is not yet ready, clicking a button (JS interacton in code) won't work.
+* (todo?) As there is only one page being loaded at the moment of time, it makes sense to maintain a single NavigationRecord in the wookie.navigationRecords
+* So eventually in the majority of the scenarios (all?) the interaction can be done in a single thread like:
 
-(todo?) As there is only one page being loaded at the moment of time, it makes sense to maintain a single NavigationRecord in the wookie.navigationRecords
+```scala
+open('www.google.com')
+
+// WookieScenarioLock
+
+// open will start loading the page and lock current thread
+// WhenLoaded will unlock the execution, store PageLoaded event into the context so that $ will not require it
+
+$("input[maxlength]")
+    .timeout("2s")
+    .value("wookie-view")
+    .submit()
+    
+// submit is different here as it should lock current thread. So maybe lock/unlock should be added to all page loading
+
+//...
+
+$('.download').clickLink()
+download()
+    .matchByAddress((s) => s.contains('download.oracle.com'))
+    .awaitWithLock()
+```

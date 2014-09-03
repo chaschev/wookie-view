@@ -26,6 +26,56 @@ abstract class CompositionJQueryWrapper(selector: String, wookie: WookieView, ur
 
 }
 
+class JQueryWrapperBridge(delegate: JQueryWrapper)
+  extends JQueryWrapper(delegate.selector, delegate.wookie, delegate.url, delegate.e) {
+  
+  val function = delegate.function
+
+  override def attr(name: String): String = delegate.attr(name)
+
+  override def attrs(): List[String] = delegate.attrs()
+
+  override def text(): String = delegate.text()
+
+  override def html(): String = delegate.html()
+
+  override def followLink(whenLoaded: Option[WhenPageLoaded]): JQueryWrapper = delegate.followLink(whenLoaded)
+
+  override def mouseClick(whenDone: Option[WhenPageLoaded]): JQueryWrapper = delegate.mouseClick(whenDone)
+
+  override def triggerEvent(event: String): JQueryWrapper = delegate.triggerEvent(event)
+
+  override def find(findSelector: String): List[JQueryWrapper] = delegate.find(findSelector)
+
+  override def parent(): List[JQueryWrapper] = delegate.parent()
+
+  override def attr(name: String, value: String): JQueryWrapper = delegate.attr(name, value)
+
+  override def value(value: String): JQueryWrapper = delegate.value(value)
+
+  override def submit(whenLoaded: Option[WhenPageLoaded]): JQueryWrapper = delegate.submit(whenLoaded)
+
+  override private[view] def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] = delegate._jsJQueryToResultList(r)
+
+  override private[view] def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] = delegate._jsJQueryToDirectResultList(r)
+
+  override def pressKey(code: Int): JQueryWrapper = delegate.pressKey(code)
+
+  override def pressEnter(): JQueryWrapper = delegate.pressEnter()
+
+  override def interact(script: String, timeoutMs: Long): AnyRef = delegate.interact(script, timeoutMs)
+
+  override def html(s: String): JQueryWrapper = delegate.html(s)
+
+  override def append(s: String): JQueryWrapper = delegate.append(s)
+
+  override def asResultList(): List[JQueryWrapper] = delegate.asResultList()
+
+  override def asResultListJava(): JList[JQueryWrapper] = delegate.asResultListJava()
+
+  override def toString: String = delegate.toString
+}
+
 class DirectWrapper(isDom: Boolean = false, jsObject: JSObject,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper("", wookie, url, e){
   val function = "directFn"
 
@@ -69,16 +119,35 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
   }
 
-  def clickLink(): JQueryWrapper = {
+  def followLink(whenLoaded: Option[WhenPageLoaded] = None): JQueryWrapper = {
+    if(whenLoaded.isDefined) {
+      wookie.waitForLocation(new WaitArg().whenLoaded(whenLoaded.get))
+    }
+
     interact(s"clickItem($function, '$escapedSelector')".toString)
+
     this
   }
 
-  def mouseClick(): JQueryWrapper = {
+  def mouseClick(whenLoaded: Option[WhenPageLoaded] = None): JQueryWrapper = {
+    if(whenLoaded.isDefined) {
+      wookie.waitForLocation(new WaitArg().whenLoaded(whenLoaded.get))
+    }
+
     triggerEvent("click")
   }
 
-  def triggerEvent(event: String): JQueryWrapper ={
+  def submit(whenLoaded: Option[WhenPageLoaded] = None): JQueryWrapper = {
+    if(whenLoaded.isDefined) {
+      wookie.waitForLocation(new WaitArg().whenLoaded(whenLoaded.get))
+    }
+
+    interact(s"submitEnclosingForm($function, '$escapedSelector')")
+    this
+  }
+
+
+  def triggerEvent(event: String): JQueryWrapper = {
     interact(s"$function('$escapedSelector').trigger('$event')".toString)
     this
   }
@@ -104,12 +173,8 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     this
   }
 
-  def submit(): JQueryWrapper = {
-    interact(s"submitEnclosingForm($function, '$escapedSelector')")
-    this
-  }
 
-  protected def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] =
+  private[view] def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] =
   {
     val l = r.getMember("length").asInstanceOf[Int]
 
@@ -131,7 +196,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     list.toList
   }
 
-  protected def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] =
+  private[view] def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] =
   {
     val l = r.getMember("length").asInstanceOf[Int]
 

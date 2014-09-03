@@ -78,7 +78,7 @@ object DownloadJDK {
               $("#sso_username").value(login)
               $("#ssopassword").value(password)
 
-              $(".submit_btn").clickLink()
+              $(".submit_btn").followLink()
             }
           }))
 

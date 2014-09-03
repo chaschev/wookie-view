@@ -15,7 +15,7 @@ WookieView allows you to automatize web browsing – i.e. to search with Google 
 
 To open a project in your IDE, you might import it as a Maven project.
 
-Maven artifacts are coming as soon as the project gets popular.
+Maven artifacts are coming if the project gets popular.
 
 ## Code Examples
 

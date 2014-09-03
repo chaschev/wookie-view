@@ -24,6 +24,7 @@ import org.apache.commons.lang3.{StringEscapeUtils, StringUtils}
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
+import wookie.JQuerySupplier
 import wookie.view.WookieView.logger
 
 import scala.collection.JavaConversions._
@@ -604,11 +605,25 @@ class WookieView(builder: WookieBuilder) extends Pane {
    * @param jQuerySelector
    * @return
    */
-  def $(jQuerySelector: String, url: String)(implicit e: PageDoneEvent): JQueryWrapper = {
+  def createJWrapper(jQuerySelector: String, url: String)(implicit e: PageDoneEvent): JQueryWrapper = {
     val sel = StringEscapeUtils.escapeEcmaScript(jQuerySelector)
 
     val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]
 
     new DirectWrapper(false, $obj, this, url, e)
+  }
+
+  def createJSupplier(url: Option[String], e: Option[PageDoneEvent]) = {
+    new JQuerySupplier {
+      override def apply(selector: String): JQueryWrapper = {
+        val myUrl = url.getOrElse(getEvent.asInstanceOf[OkPageDoneEvent].wookieEvent.newLoc)
+
+        createJWrapper(selector, myUrl)(getEvent)
+      }
+
+      override def getEvent: PageDoneEvent = {
+        e.getOrElse(super.getEvent)
+      }
+    }
   }
 }
