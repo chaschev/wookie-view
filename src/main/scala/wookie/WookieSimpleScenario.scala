@@ -89,37 +89,48 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
     Await.result(promise.future, Duration(5, "s"))
   }
 
+  private[this] def createSimpleScenarioWrapperBridge(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper = {
+    // this mess redirects all calls to the default JQueryWrapper
+    // and for three specific cases of following the links it adds locking/unlocking
+    new JQueryWrapperBridge(delegate) {
+      //ok they ignore the input argument which is not good
+      override def followLink(arg: WaitArg): JQueryWrapper = {
+        lock.acquire()
+        val r = super.followLink(whenLoadedForSimpleScenario(url))
+        lock.await()
+        r
+      }
+
+      override def mouseClick(arg: WaitArg): JQueryWrapper = {
+        lock.acquire()
+        val r = super.mouseClick(whenLoadedForSimpleScenario(url))
+        lock.await()
+        r
+      }
+
+      override def submit(arg: WaitArg): JQueryWrapper = {
+        lock.acquire()
+        val r = super.submit(whenLoadedForSimpleScenario(url))
+        lock.await()
+        r
+      }
+
+      override def asResultList(): List[JQueryWrapper] = {
+        super.asResultList().map { $ =>
+          createSimpleScenarioWrapperBridge($, selector, url)
+        }
+      }
+    }
+
+  }
+
   private[this] def whenLoadedForSimpleScenario(url: String): WaitArg = {
     val whenLoaded = new WhenPageLoaded {
       override def apply()(implicit e: PageDoneEvent): Unit = {
         context.lastEvent = Some(e)
         context.last$ = Some(new JQuerySupplier {
           override def apply(selector: String): JQueryWrapper = {
-            // this mess redirects all calls to the default JQueryWrapper
-            // and for three specific cases of following the links it adds locking/unlocking
-            new JQueryWrapperBridge(wookie.createJWrapper(selector, url)) {
-              //ok they ignore the input argument which is not good
-              override def followLink(arg: WaitArg): JQueryWrapper = {
-                lock.acquire()
-                val r = super.followLink(whenLoadedForSimpleScenario(url))
-                lock.await()
-                r
-              }
-
-              override def mouseClick(arg: WaitArg): JQueryWrapper = {
-                lock.acquire()
-                val r = super.mouseClick(whenLoadedForSimpleScenario(url))
-                lock.await()
-                r
-              }
-
-              override def submit(arg: WaitArg): JQueryWrapper = {
-                lock.acquire()
-                val r = super.submit(whenLoadedForSimpleScenario(url))
-                lock.await()
-                r
-              }
-            }
+            createSimpleScenarioWrapperBridge(wookie.createJWrapper(selector, url), selector, url)
           }
         })
 
