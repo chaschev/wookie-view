@@ -3,6 +3,7 @@ package wookie
 import java.util.concurrent.Semaphore
 import javafx.application.Platform
 
+import netscape.javascript.JSObject
 import org.slf4j.LoggerFactory
 import wookie.WookieScenarioLock.logger
 import wookie.view._
@@ -16,8 +17,16 @@ import scala.util.Try
  */
 
 class WookieScenarioLock(
-  private val semaphore: Semaphore = new Semaphore(1)){
-  def await() = {
+  scenario: WookieSimpleScenario
+){
+
+  private val semaphore: Semaphore = new Semaphore(1)
+
+  def await(): Unit = {
+//    Preconditions.checkArgument(scenario.locksEnabled, "locks must be enabled!", Array())
+
+    if(!scenario.locksEnabled) return
+
     var busy = true
 
     while(busy){
@@ -26,7 +35,7 @@ class WookieScenarioLock(
         busy = false
       }
 
-      logger.debug("awaiting semaphore..")
+//      logger.debug("awaiting semaphore..")
 
       Thread.sleep(100)
     }
@@ -34,6 +43,8 @@ class WookieScenarioLock(
   }
 
   def acquire(): Unit = {
+    if(!scenario.locksEnabled) return
+    
     if(!semaphore.tryAcquire()){
       logger.warn("warning: second lock!", new Exception)
       semaphore.acquire()
@@ -43,6 +54,9 @@ class WookieScenarioLock(
   }
 
   def wakeUp(): Unit = {
+//    Preconditions.checkArgument(scenario.locksEnabled, "trying to wake up with disabled locks", Array())
+    if(!scenario.locksEnabled) return
+
     semaphore.release()
     logger.debug(s"+1 (${semaphore.availablePermits()})")
 
@@ -67,11 +81,23 @@ class WookieScenarioContext(
   var timeoutMs: Int = 30000
 }
 
-abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier) {
-  import scala.concurrent.ExecutionContext.Implicits.global
+trait WrapperUtils {
+  def wrapDomIntoJava(dom: JSObject, wookie: WookieView, url: String): JQueryWrapper = {
+    new DirectWrapper(true, dom, wookie, url, null)
+  }
 
-  final val lock = new WookieScenarioLock()
+  def wrapJQueryIntoJava($: JSObject, wookie: WookieView, url: String): JQueryWrapper = {
+    new DirectWrapper(false, $, wookie, url, null)
+  }
+}
+
+abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
+  extends WrapperUtils {
+
+  final val lock = new WookieScenarioLock(this)
   final val context = new WookieScenarioContext
+  
+  private[wookie] var locksEnabled = true
 
   @volatile
   protected var wookie: WookieView = _
@@ -150,18 +176,32 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
   }
 
   def download(matcher: NavigationMatcher) = {
-    lock.acquire()
+//    lock.acquire()
 
     wookie
       .waitForDownloadToStart(matcher)
-      .andThen({case _ => lock.wakeUp()})
-
-    lock.await()
+//      .andThen({case _ => lock.wakeUp()})
+//
+//    lock.await()
   }
 
   def run()
 
-  def asScenario = WookieSimpleScenario.asScenario(this)
+  def asNotSimpleScenario = WookieSimpleScenario.asScenario(this)
+
+  def wrapDomIntoJava(dom: JSObject, url: String): JQueryWrapper = {
+    createSimpleScenarioWrapperBridge(
+      super.wrapDomIntoJava(dom, wookie, url), "", url
+    )
+  }
+
+  def wrapJQueryIntoJava($: JSObject, url: String): JQueryWrapper = {
+    createSimpleScenarioWrapperBridge(
+      super.wrapJQueryIntoJava($, wookie, url), "", url
+    )
+  }
+  
+  def enableLocking(b: Boolean): Unit = locksEnabled = b
 }
 
 object WookieSimpleScenario {

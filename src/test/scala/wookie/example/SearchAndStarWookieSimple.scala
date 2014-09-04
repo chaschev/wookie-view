@@ -53,14 +53,13 @@ object SearchAndStarWookieSimple {
 
           System.out.println("results: " + $("h3.r").asResultList)
 
-          val githubLink = $("h3.r a").asResultList().find(_.text().contains("chaschev")).get
+          $("h3.r a").asResultList().find(_.text().contains("chaschev")).get.followLink()
 
-          println("!!!!!!!!" + githubLink.getClass.getSimpleName)
+          $("a.button.signin").followLink()
 
-          githubLink.followLink()
-
-          val signIn = $("a.button.signin")
-          signIn.followLink()
+          $("#login_field").value(login)
+          $("#password").value(password)
+            .submit()
 
           val starButton = $(".star-button:visible")
 
@@ -71,6 +70,6 @@ object SearchAndStarWookieSimple {
             println("Invoke me under my stars!")
           }
         }
-      }.asScenario)
+      }.asNotSimpleScenario)
   }
 }

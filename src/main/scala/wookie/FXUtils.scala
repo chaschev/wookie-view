@@ -2,7 +2,8 @@ package wookie
 
 import javafx.application.Platform
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.Try
 
 /**
@@ -27,5 +28,9 @@ object FXUtils {
     }
 
     promise.future
+  }
+
+  def execInFxAndAwait[R](lambda: () => R, timeoutMs: Int = 5000): R = {
+    Await.result(execInFx(lambda), Duration(timeoutMs, "ms"))
   }
 }

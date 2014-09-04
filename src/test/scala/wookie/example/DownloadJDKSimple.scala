@@ -16,9 +16,6 @@ object DownloadJDKSimple {
 
   final val logger = LoggerFactory.getLogger(DownloadJDK.getClass)
 
-  @volatile
-  var version: String = "8u20"
-
   def main(args: Array[String])
   {
     val app = WookieSandboxApp.start()
@@ -33,7 +30,7 @@ object DownloadJDKSimple {
     password = props.getProperty("oracle.password")
 
     app.runOnStage(
-      new WookieSimpleScenario("Star Wookie Page!", DownloadJDK.defaultPanelSupplier) {
+      new WookieSimpleScenario(s"Download JDK ${DownloadJDK.version}", DownloadJDK.defaultPanelSupplier) {
         override def run(): Unit = {
           val (latestUrl, archiveUrl) = DownloadJDK.findLinksFromVersion()
 
@@ -43,22 +40,13 @@ object DownloadJDKSimple {
               tryArchivePage(jQueryObj.isDefined, archiveUrl, wookie)
             }else{
               println(s"found the link at ${latestUrl.get}, download should start...")
+              enableLocking(false)
+              downloadJDKHook()
+              jQueryObj.get.followLink()
+              enableLocking(true)
             }
           } else {
             tryArchivePage(found = false, archiveUrl, wookie)
-          }
-        }
-
-        private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String): Option[JQueryWrapper] = {
-          load(archiveUrl)
-
-          try {
-            val jQueryObj = browser.getEngine.executeScript("find('" + DownloadJDK.version + "', true, 'linux');").asInstanceOf[Boolean]
-
-            Some(new DirectWrapper(true, jQueryObj.asInstanceOf[JSObject], browser, archiveUrl, null))
-          } catch {
-            case e: Exception => e.printStackTrace()
-              None
           }
         }
 
@@ -70,13 +58,31 @@ object DownloadJDKSimple {
 
           $(".submit_btn").followLink()
 
-          downloadJDK()
+          downloadJDKHook()
         }
 
-        protected def downloadJDK() = {
+        protected def downloadJDKHook() = {
           download(new LocationMatcher(loc =>
             loc.contains("download.oracle.com") && loc.contains("?")
           ))
+        }
+
+        private[wookie] def tryFindVersionAtPage(browser: WookieView, archiveUrl: String): Option[JQueryWrapper] = {
+          load(archiveUrl)
+
+          try {
+            val jQueryObj = FXUtils.execInFxAndAwait(() => {
+              browser.getEngine.executeScript("find('" + DownloadJDK.version + "', true, 'linux');").asInstanceOf[JSObject]
+            })
+
+            if(jQueryObj == null)
+              None
+            else
+              Some(wrapDomIntoJava(jQueryObj, archiveUrl))
+          } catch {
+            case e: Exception => e.printStackTrace()
+              None
+          }
         }
 
         protected def tryArchivePage(found: Boolean, archiveUrl: Option[String], browser: WookieView) = {
@@ -86,6 +92,11 @@ object DownloadJDKSimple {
 
               if (link.isDefined) {
                 logger.info("found a link, will be redirected to the login page...")
+
+                downloadJDKHook()
+
+                // if there is a download, it will start and lock will freeze execution here
+                // if there is no download, it will continue to the login form
                 link.get.followLink()
                 loginAndDownload()
               } else {
@@ -97,10 +108,10 @@ object DownloadJDKSimple {
             }
           else {
             logger.info("download started...")
-            downloadJDK()
+            downloadJDKHook()
           }
         }
 
-      }.asScenario)
+      }.asNotSimpleScenario)
   }
 }

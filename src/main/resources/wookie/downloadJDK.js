@@ -1,6 +1,8 @@
 var find = function(version, x64, platform){
     var r = [null];
 
+    alert("seaching for jdk-" + version + "-" + (x64 ? "x64" : "x86") + "-" + platform);
+
     jQuery("div.lic_div").each(function(index, el){
         var $table = jQuery(el).closest('table');
         $links = $table.find('a[id^=jdk-][href]');
