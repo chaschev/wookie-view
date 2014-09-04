@@ -102,7 +102,8 @@ case class WookieViewOptions(
   useJQuery: Boolean,
   includeJsScript: Option[String],
   includeJsUrls: List[String],
-  downloadDir: File
+  downloadDir: File,
+  defaultTimeoutMs: Int
 )
 
 class WookieView(builder: WookieBuilder) extends Pane {
@@ -111,12 +112,13 @@ class WookieView(builder: WookieBuilder) extends Pane {
   protected val webView: Option[WebView] = if (builder.createWebView) Some(new WebView) else None
   protected val webEngine: WebEngine = if (webView == None) new WebEngine() else webView.get.getEngine
 
-  protected val options = new WookieViewOptions(
+  val options = new WookieViewOptions(
     useFirebug = builder.useFirebug,
     useJQuery = builder.useJQuery,
     includeJsScript = builder.includeJsScript,
     includeJsUrls = builder.includeJsUrls.toList,
-    downloadDir = builder.downloadDir
+    downloadDir = builder.downloadDir,
+    defaultTimeoutMs = builder.defaultTimeoutMs
   )
 
   val progressLabel = new Label("")
@@ -157,7 +159,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
           //todo: get oldLoc from history
 
-          logger.info(s"page ready: $currentLocation")
+          logger.info(s"worker state -> SUCCEEDED, page ready: $currentLocation")
 
           val pageLoadedId = random.nextInt()
 
@@ -176,7 +178,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
         if(newState == Worker.State.FAILED || newState == Worker.State.FAILED ){
           logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
         } else {
-          logger.debug(s"worker state changed to $newState")
+          logger.debug(s"worker state -> $newState")
         }
       }
     })
@@ -184,8 +186,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
     webEngine.locationProperty().addListener(new ChangeListener[String] {
       def changed(observableValue: ObservableValue[_ <: String], oldLoc: String, newLoc: String)
       {
-        logger.info(s"location changed to $newLoc")
-
         changedLocationsHistory += newLoc
 
         val handlers = scanNavRecords(new LocationChangedEvent(random.nextInt(), newLoc, oldLoc))
@@ -222,7 +222,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
   def waitForDownloadToStart(matcher: NavigationMatcher): SFuture[DownloadResult] = {
     val downloadPromise = Promise[DownloadResult]()
 
-    waitForLocation(new WaitArg()
+    waitForLocation(defaultArg(name = "wait for download")
       .timeoutNone()
       .withMatcher(matcher)
       .filterEvents(e => e.isInstanceOf[LocationChangedEvent])
@@ -424,7 +424,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
   }
 
   protected def load(location: String, onLoad: Option[WhenPageLoaded] = None): WookieView = {
-    val arg = new WaitArg()
+    val arg = defaultArg()
     
     if(onLoad.isDefined) arg.whenLoaded(onLoad.get)
     
@@ -447,7 +447,11 @@ class WookieView(builder: WookieBuilder) extends Pane {
     waitForLocation(arg)
 
     queriedLocationsHistory += canonizedUrl
-    webEngine.load(canonizedUrl)
+
+    Platform.runLater(new Runnable {
+      override def run(): Unit = webEngine.load(canonizedUrl)
+
+    })
 
     this
   }
@@ -626,4 +630,6 @@ class WookieView(builder: WookieBuilder) extends Pane {
       }
     }
   }
+
+  def defaultArg(name: String = ""): WaitArg = new WaitArg(name = name, wookie = this).timeoutMs(options.defaultTimeoutMs)
 }

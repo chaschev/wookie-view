@@ -8,7 +8,7 @@ import javafx.event.{ActionEvent, EventHandler}
 import javafx.scene.control.{Button, TextArea, TextField}
 import javafx.scene.input.{KeyCode, KeyEvent}
 import javafx.scene.layout.{HBox, Priority, VBox}
-import javafx.scene.web.{WebEngine, WebErrorEvent}
+import javafx.scene.web.WebErrorEvent
 
 import wookie.WookiePanel.JS_INVITATION
 import wookie.view.WookieView
@@ -37,8 +37,8 @@ class WookiePanel(builder: WookiePanelBuilder) extends VBox with WookiePanelFiel
   val jsButton = new Button("Run JS")
   val go = new Button("Go")
 
-  val wookie: WookieView = builder.wookie
-  val engine: WebEngine = builder.wookie.getEngine
+  val wookie = builder.wookie
+  val engine = wookie.getEngine
 
   val goAction = new EventHandler[ActionEvent] {
     def handle(arg0: ActionEvent)
@@ -100,17 +100,17 @@ class WookiePanel(builder: WookiePanelBuilder) extends VBox with WookiePanelFiel
 
 
     if (builder.showDebugPanes) {
-//      val engine:WebEngine = builder.wookie.getEngine
-
       engine.locationProperty.addListener(new ChangeListener[String] {
         def changed(observableValue: ObservableValue[_ <: String], s: String, newLoc: String)
         {
-          log(s"location changed to: $newLoc")
+          log(s"location changed to: $newLoc, from $s")
 
           location.setText(newLoc)
         }
       })
 
+      // setOnAlert, maybe??
+      // see also setOnAlert in WookieView
       engine.setOnError(new EventHandler[WebErrorEvent] {
         def handle(webEvent: WebErrorEvent)
         {

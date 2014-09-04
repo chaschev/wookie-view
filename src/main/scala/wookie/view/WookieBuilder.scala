@@ -14,6 +14,7 @@ class WookieBuilder {
   var includeJsScript: Option[String] = None
   var includeJsUrls: mutable.MutableList[String] = new mutable.MutableList[String]
   var downloadDir = new File(".")
+  var defaultTimeoutMs: Int = 60000
 
   def build: WookieView =
   {
@@ -26,5 +27,6 @@ class WookieBuilder {
   def includeJsScript(s: String): WookieBuilder = { includeJsScript = Some(s); this }
   def addScriptUrls(s: String): WookieBuilder = { includeJsUrls += s; this }
   def downloadDir(file: File): WookieBuilder = { downloadDir = file; this }
+  def defaultTimeoutMs(ms: Int): WookieBuilder = { defaultTimeoutMs = ms; this }
 }
 

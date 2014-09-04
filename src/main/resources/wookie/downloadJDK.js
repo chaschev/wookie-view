@@ -46,6 +46,7 @@ var find = function(version, x64, platform){
 
 //find('7u45', true, 'linux');
 
+//this version clicks
 var downloadIfFound = function(version, x64, platform){
     var $a = find(version, x64, platform);
 

@@ -51,6 +51,25 @@ object SearchAndStarWookieSimple {
             .value("wookie-view")
             .submit()
 
+          System.out.println("results: " + $("h3.r").asResultList)
+
+          val githubLink = $("h3.r a").asResultList().find(_.text().contains("chaschev")).get
+
+          println("!!!!!!!!" + githubLink.getClass.getSimpleName)
+
+          githubLink.followLink()
+
+          val signIn = $("a.button.signin")
+          signIn.followLink()
+
+          val starButton = $(".star-button:visible")
+
+          if(starButton.text().contains("Star")) {
+            starButton.mouseClick()
+            println("Now the star will shine!")
+          } else {
+            println("Invoke me under my stars!")
+          }
         }
       }.asScenario)
   }

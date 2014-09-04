@@ -68,7 +68,7 @@ object DownloadJDK {
         procedure = (wookiePanel, wookie, $) => {
 
           //this is login form state
-          wookie.waitForLocation(new WaitArg()
+          wookie.waitForLocation(wookie.defaultArg("login form")
             .timeoutNone()
             .matchByAddress(_.contains("signon.jsp"))
             .whenLoaded(new WhenPageLoaded {

@@ -9,8 +9,8 @@ var clickJqueryResult = function($el){
   clickDomElement(el, etype);
 };
 
-var clickItem = function(operationFn, $sel){
-    alert("about to click: " + jQuery_text(operationFn, $sel, true));
+var followLink = function(operationFn, $sel){
+    alert("about to click a link: " + jQuery_text(operationFn, $sel, true));
 
     clickJqueryResult(operationFn($sel));
 };

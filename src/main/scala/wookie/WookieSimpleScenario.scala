@@ -1,19 +1,59 @@
 package wookie
 
-import java.util.concurrent.{TimeUnit, Semaphore}
+import java.util.concurrent.Semaphore
+import javafx.application.Platform
 
+import org.slf4j.LoggerFactory
+import wookie.WookieScenarioLock.logger
 import wookie.view._
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Promise}
+import scala.util.Try
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
 
 class WookieScenarioLock(
-   private val semaphore: Semaphore = new Semaphore(1)){
-  def await() = semaphore.tryAcquire(100, TimeUnit.DAYS)
+  private val semaphore: Semaphore = new Semaphore(1)){
+  def await() = {
+    var busy = true
 
-  def acquire(): Unit = semaphore.acquire()
-  def wakeUp(): Unit = semaphore.release()
+    while(busy){
+      if(semaphore.tryAcquire()){
+        semaphore.release()
+        busy = false
+      }
+
+      logger.debug("awaiting semaphore..")
+
+      Thread.sleep(100)
+    }
+
+  }
+
+  def acquire(): Unit = {
+    if(!semaphore.tryAcquire()){
+      logger.warn("warning: second lock!", new Exception)
+      semaphore.acquire()
+    }
+
+    logger.debug(s"-1 (${semaphore.availablePermits()})", new Exception)
+  }
+
+  def wakeUp(): Unit = {
+    semaphore.release()
+    logger.debug(s"+1 (${semaphore.availablePermits()})")
+
+    if(semaphore.availablePermits() == 0){
+      logger.info("zero permits after release!")
+    }
+  }
+}
+
+object WookieScenarioLock {
+  val logger = LoggerFactory.getLogger(classOf[WookieScenarioLock])
 }
 
 
@@ -31,18 +71,26 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
   import scala.concurrent.ExecutionContext.Implicits.global
 
   final val lock = new WookieScenarioLock()
-
   final val context = new WookieScenarioContext
 
   @volatile
-  private var wookie: WookieView = _
+  protected var wookie: WookieView = _
 
   def $(selector: String): JQueryWrapper = {
-    context.last$.get.apply(selector)
+    val promise = Promise[JQueryWrapper]()
+    
+    Platform.runLater(new Runnable {
+      override def run(): Unit = {
+        val obj = context.last$.get.apply(selector)
+        promise.complete(Try(obj))
+      }
+    })
+
+    Await.result(promise.future, Duration(5, "s"))
   }
 
-  private[this] def whenLoadedForSimpleScenario(url: String): WhenPageLoaded = {
-    new WhenPageLoaded {
+  private[this] def whenLoadedForSimpleScenario(url: String): WaitArg = {
+    val whenLoaded = new WhenPageLoaded {
       override def apply()(implicit e: PageDoneEvent): Unit = {
         context.lastEvent = Some(e)
         context.last$ = Some(new JQuerySupplier {
@@ -50,23 +98,24 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
             // this mess redirects all calls to the default JQueryWrapper
             // and for three specific cases of following the links it adds locking/unlocking
             new JQueryWrapperBridge(wookie.createJWrapper(selector, url)) {
-              override def followLink(whenLoaded: Option[WhenPageLoaded]): JQueryWrapper = {
-                lock.wakeUp()
-                val r = super.followLink(Some(whenLoadedForSimpleScenario(url)))
+              //ok they ignore the input argument which is not good
+              override def followLink(arg: WaitArg): JQueryWrapper = {
+                lock.acquire()
+                val r = super.followLink(whenLoadedForSimpleScenario(url))
                 lock.await()
                 r
               }
 
-              override def mouseClick(whenDone: Option[WhenPageLoaded]): JQueryWrapper = {
+              override def mouseClick(arg: WaitArg): JQueryWrapper = {
                 lock.acquire()
-                val r = super.mouseClick(Some(whenLoadedForSimpleScenario(url)))
+                val r = super.mouseClick(whenLoadedForSimpleScenario(url))
                 lock.await()
                 r
               }
 
-              override def submit(whenLoaded: Option[WhenPageLoaded]): JQueryWrapper = {
+              override def submit(arg: WaitArg): JQueryWrapper = {
                 lock.acquire()
-                val r = super.submit(Some(whenLoadedForSimpleScenario(url)))
+                val r = super.submit(whenLoadedForSimpleScenario(url))
                 lock.await()
                 r
               }
@@ -77,6 +126,8 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
         lock.wakeUp()
       }
     }
+
+    wookie.defaultArg().whenLoaded(whenLoaded)
   }
 
   def load(url: String) = {

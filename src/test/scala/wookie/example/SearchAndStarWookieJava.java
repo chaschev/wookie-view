@@ -46,7 +46,7 @@ public class SearchAndStarWookieJava {
                 (wookiePanel, wookie, $) -> {
                     // google search result state
                     wookie
-                        .waitForLocation(new WaitArg("google search results")
+                        .waitForLocation(wookie.defaultArg("google search results")
                             .matchByAddress((s) -> s.contains("q="))
                             .whenLoaded(e -> {
                                     System.out.println("results: " + $.apply("h3.r").asResultList());
@@ -57,7 +57,7 @@ public class SearchAndStarWookieJava {
                                         .filter((j) -> j.text().contains("chaschev"))
                                         .findFirst().get();
 
-                                    githubLink.followLink(Option.empty());
+                                    githubLink.followLink(null);
                                 }
                             ));
 
@@ -65,26 +65,26 @@ public class SearchAndStarWookieJava {
                     // there is no problem, because matchers are removed when they are hit
                     // waits for wookie-view page to load and clicks signin button
                     wookie
-                        .waitForLocation(new WaitArg("git wookie not logged in")
+                        .waitForLocation(wookie.defaultArg("git wookie not logged in")
                         .matchByAddress((s) -> s.contains("/wookie-view"))
                         .whenLoaded(e -> {
-                            $.apply("a.button.signin").followLink(Option.empty());
+                            $.apply("a.button.signin").followLink(null);
                         }));
 
                     // login form
                     wookie
-                        .waitForLocation(new WaitArg("git login")
+                        .waitForLocation(wookie.defaultArg("git login")
                         .matchByAddress((s) -> s.contains("github.com/login"))
                         .whenLoaded(e -> {
                             wookie
-                                .waitForLocation(new WaitArg("wookie logged in")
+                                .waitForLocation(wookie.defaultArg("wookie logged in")
                                 .matchByAddress((s) -> s.contains("/wookie-view"))
                                 .whenLoaded(e2 -> {
                                     //click 'star' button
                                     JQueryWrapper starButton = $.apply(".star-button:visible");
 
                                     if (starButton.text().contains("Star")) {
-                                        starButton.mouseClick(Option.empty());
+                                        starButton.mouseClick(null);
                                         System.out.println("Now the star will shine!");
                                     } else {
                                         System.out.println("Invoke me under my stars!");
@@ -93,7 +93,7 @@ public class SearchAndStarWookieJava {
                             // fill login data and submit the form
                             $.apply("#login_field").value(login);
                             $.apply("#password").value(password)
-                                    .submit(Option.empty());
+                                    .submit(null);
 
                         }));
 
@@ -101,7 +101,7 @@ public class SearchAndStarWookieJava {
                     // submit google request and start the scenario
                 $.apply("input[maxlength]")
                         .value("wookie-view")
-                        .submit(Option.empty());
+                        .submit(null);
                 }
             ));
     }

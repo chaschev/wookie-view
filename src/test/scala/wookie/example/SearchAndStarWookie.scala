@@ -3,7 +3,7 @@ package wookie.example
 import java.util.Properties
 
 import wookie._
-import wookie.view.{PageDoneEvent, WaitArg, WhenPageLoaded, WookieView}
+import wookie.view.{PageDoneEvent, WhenPageLoaded, WookieView}
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
@@ -50,7 +50,7 @@ object SearchAndStarWookie {
         procedure = (wookiePanel, wookie, $) => {
 
           // google search result state
-          wookie.waitForLocation(new WaitArg("google search results")
+          wookie.waitForLocation(wookie.defaultArg("google search results")
             .matchByAddress(_.contains("q="))
             .whenLoaded(new WhenPageLoaded {
             override def apply()(implicit e: PageDoneEvent): Unit = {
@@ -68,7 +68,7 @@ object SearchAndStarWookie {
           // there is no problem, because matchers are removed when they are hit
           // waits for wookie-view page to load and clicks signin button
           wookie
-            .waitForLocation(new WaitArg("git wookie not logged in")
+            .waitForLocation(wookie.defaultArg("git wookie not logged in")
             .matchByAddress(_.contains("/wookie-view"))
             .whenLoaded(new WhenPageLoaded {
               override def apply()(implicit e: PageDoneEvent): Unit = {
@@ -77,14 +77,14 @@ object SearchAndStarWookie {
           }))
 
           // login form
-          wookie.waitForLocation(new WaitArg("git login")
+          wookie.waitForLocation(wookie.defaultArg("git login")
             .matchByAddress(_.contains("github.com/login"))
             .whenLoaded(new WhenPageLoaded {
             override def apply()(implicit e: PageDoneEvent): Unit = {
 
               // github.com/wookie-view, logged in state
               // add this state before submitting the form
-              wookie.waitForLocation(new WaitArg("wookie logged in")
+              wookie.waitForLocation(wookie.defaultArg("wookie logged in")
                 .matchByAddress(_.contains("/wookie-view"))
                 .whenLoaded(new WhenPageLoaded {
                   override def apply()(implicit e: PageDoneEvent): Unit = {

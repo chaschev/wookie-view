@@ -1,16 +1,18 @@
 package wookie.view
 
-import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
+import java.util.concurrent.TimeoutException
 import java.util.{List => JList}
 import javafx.concurrent.Worker.State
 
 import netscape.javascript.JSObject
 import org.apache.commons.lang3.StringEscapeUtils
-
-import scala.collection.mutable
-import scala.util.Random
+import wookie.FXUtils
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Future, Await, Promise}
+import scala.util.{Random, Try}
 
 
 /**
@@ -31,47 +33,48 @@ class JQueryWrapperBridge(delegate: JQueryWrapper)
   
   val function = delegate.function
 
-  override def attr(name: String): String = delegate.attr(name)
+  override def attr(name: String): String = { delegate.attr(name) }
 
-  override def attrs(): List[String] = delegate.attrs()
+  override def attrs(): List[String] = { delegate.attrs() }
 
-  override def text(): String = delegate.text()
+  override def text(): String = { delegate.text() }
 
-  override def html(): String = delegate.html()
+  override def html(): String = { delegate.html() }
 
-  override def followLink(whenLoaded: Option[WhenPageLoaded]): JQueryWrapper = delegate.followLink(whenLoaded)
+  override def followLink(arg: WaitArg = wookie.defaultArg()): JQueryWrapper = { delegate.followLink(arg); this }
 
-  override def mouseClick(whenDone: Option[WhenPageLoaded]): JQueryWrapper = delegate.mouseClick(whenDone)
+  override def mouseClick(arg: WaitArg = wookie.defaultArg()): JQueryWrapper = { delegate.mouseClick(arg); this }
 
-  override def triggerEvent(event: String): JQueryWrapper = delegate.triggerEvent(event)
+  override def submit(arg: WaitArg = wookie.defaultArg()): JQueryWrapper = { delegate.submit(arg); this }
 
-  override def find(findSelector: String): List[JQueryWrapper] = delegate.find(findSelector)
+  override def triggerEvent(event: String, arg: WaitArg = wookie.defaultArg()): JQueryWrapper = { delegate.triggerEvent(event, arg); this }
 
-  override def parent(): List[JQueryWrapper] = delegate.parent()
+  override def find(findSelector: String): List[JQueryWrapper] = { delegate.find(findSelector) }
 
-  override def attr(name: String, value: String): JQueryWrapper = delegate.attr(name, value)
+  override def parent(): List[JQueryWrapper] = { delegate.parent() }
 
-  override def value(value: String): JQueryWrapper = delegate.value(value)
+  override def attr(name: String, value: String): JQueryWrapper = { delegate.attr(name, value); this }
 
-  override def submit(whenLoaded: Option[WhenPageLoaded]): JQueryWrapper = delegate.submit(whenLoaded)
+  override def value(value: String): JQueryWrapper = { delegate.value(value); this }
 
-  override private[view] def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] = delegate._jsJQueryToResultList(r)
 
-  override private[view] def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] = delegate._jsJQueryToDirectResultList(r)
+  override private[view] def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] = { delegate._jsJQueryToResultList(r) }
 
-  override def pressKey(code: Int): JQueryWrapper = delegate.pressKey(code)
+  override private[view] def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] = { delegate._jsJQueryToDirectResultList(r) }
 
-  override def pressEnter(): JQueryWrapper = delegate.pressEnter()
+  override def pressKey(code: Int): JQueryWrapper = { delegate.pressKey(code); this }
 
-  override def interact(script: String, timeoutMs: Long): AnyRef = delegate.interact(script, timeoutMs)
+  override def pressEnter(): JQueryWrapper = { delegate.pressEnter(); this }
 
-  override def html(s: String): JQueryWrapper = delegate.html(s)
+  override def interact(script: String, timeoutMs: Long): AnyRef = { delegate.interact(script, timeoutMs); this }
 
-  override def append(s: String): JQueryWrapper = delegate.append(s)
+  override def html(s: String): JQueryWrapper = { delegate.html(s); this }
 
-  override def asResultList(): List[JQueryWrapper] = delegate.asResultList()
+  override def append(s: String): JQueryWrapper = { delegate.append(s); this }
 
-  override def asResultListJava(): JList[JQueryWrapper] = delegate.asResultListJava()
+  override def asResultList(): List[JQueryWrapper] = { delegate.asResultList() }
+
+  override def asResultListJava(): JList[JQueryWrapper] = { delegate.asResultListJava() }
 
   override def toString: String = delegate.toString
 }
@@ -93,8 +96,10 @@ class DirectWrapper(isDom: Boolean = false, jsObject: JSObject,  wookie:WookieVi
   }
 
   override def interact(script: String, timeoutMs: Long): AnyRef = {
-    assign()
-    super.interact(script, timeoutMs)
+    Await.result(FXUtils.execInFx(() => {
+      assign()
+      super.interact(script, timeoutMs)
+    }), Duration(timeoutMs, "s"))
   }
 }
 
@@ -119,36 +124,30 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
   }
 
-  def followLink(whenLoaded: Option[WhenPageLoaded] = None): JQueryWrapper = {
-    if(whenLoaded.isDefined) {
-      wookie.waitForLocation(new WaitArg().whenLoaded(whenLoaded.get))
-    }
+  def followLink(arg: WaitArg = wookie.defaultArg()): JQueryWrapper = {
+    wookie.waitForLocation(arg)
 
-    interact(s"clickItem($function, '$escapedSelector')".toString)
+    interact(s"followLink($function, '$escapedSelector')".toString, arg.getTimeoutMs)
 
     this
   }
 
-  def mouseClick(whenLoaded: Option[WhenPageLoaded] = None): JQueryWrapper = {
-    if(whenLoaded.isDefined) {
-      wookie.waitForLocation(new WaitArg().whenLoaded(whenLoaded.get))
-    }
+  def mouseClick(arg: WaitArg = wookie.defaultArg()): JQueryWrapper = {
+    wookie.waitForLocation(arg)
 
-    triggerEvent("click")
+    triggerEvent("click", arg)
   }
 
-  def submit(whenLoaded: Option[WhenPageLoaded] = None): JQueryWrapper = {
-    if(whenLoaded.isDefined) {
-      wookie.waitForLocation(new WaitArg().whenLoaded(whenLoaded.get))
-    }
+  def submit(arg: WaitArg = wookie.defaultArg()): JQueryWrapper = {
+    wookie.waitForLocation(arg)
 
-    interact(s"submitEnclosingForm($function, '$escapedSelector')")
+    interact(s"submitEnclosingForm($function, '$escapedSelector')", arg.getTimeoutMs)
     this
   }
 
 
-  def triggerEvent(event: String): JQueryWrapper = {
-    interact(s"$function('$escapedSelector').trigger('$event')".toString)
+  def triggerEvent(event: String, arg: WaitArg = wookie.defaultArg()): JQueryWrapper = {
+    interact(s"$function('$escapedSelector').trigger('$event')".toString, arg.getTimeoutMs)
     this
   }
 
@@ -222,6 +221,25 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   }
 
   def interact(script: String, timeoutMs: Long = 5000): AnyRef = {
+    val promise = Promise[AnyRef]()
+
+    FXUtils.execInFx(() => {
+      val fut = __interact(script, timeoutMs)
+      promise.completeWith(fut)
+    })
+
+    try {
+      val r = Await.result(promise.future, Duration(timeoutMs, "ms"))
+      WookieView.logger.trace(s"left interact: $script")
+      r
+    } catch{
+      case e: TimeoutException =>
+        throw new TimeoutException(s"JS was not executed in ${timeoutMs}ms")
+    }
+  }
+
+
+  private[this] def __interact(script: String, timeoutMs: Long = 5000): Future[AnyRef] = {
     WookieView.logger.debug(s"interact: $script, url=${this.url}, event=$e, " +
       s"currentDocUri: ${wookie.getCurrentDocUri}")
 
@@ -235,36 +253,23 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
     val interactionId = Random.nextInt()
 
-    val latch = new CountDownLatch(1)
-
-    var r: AnyRef = null
+    val promise = Promise[AnyRef]()
 
     // todo: remove this line when there is no failure
     val url = wookie.getEngine.getDocument.getDocumentURI
 
-    wookie.includeStuffOnPage(interactionId, url, Some(() => {
-      WookieView.logger.debug(s"executing $script")
-      r = wookie.getEngine.executeScript(script)
-      latch.countDown()
-    }))
-
-    r = wookie.getEngine.executeScript(script)
-    latch.countDown()
-
-    val started = System.currentTimeMillis()
-    var expired = false
-
-    while(!expired && !latch.await(1000, TimeUnit.MILLISECONDS) ){
-      if(System.currentTimeMillis() - started > timeoutMs) expired = true
+    val includeStuffLambda = () => {
+      wookie.includeStuffOnPage(interactionId, url, Some(() => {
+        WookieView.logger.debug(s"executing $script")
+        val r = wookie.getEngine.executeScript(script)
+        promise.complete(Try(r))
+        ()
+      }))
     }
 
-    if(expired){
-      throw new TimeoutException(s"JS was not executed in ${timeoutMs}ms")
-    }
+     includeStuffLambda()
 
-    WookieView.logger.trace(s"left interact: $script")
-
-    r
+     promise.future
   }
 
   def html(s: String):JQueryWrapper = {

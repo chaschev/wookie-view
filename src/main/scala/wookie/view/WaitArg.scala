@@ -13,7 +13,7 @@ trait WhenPageLoaded {
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
-class WaitArg(var name: String = ""){
+class WaitArg(var name: String = "", val wookie: WookieView){
   //  var predicate:Option[((String, String, NavArg) => Boolean)] = None
   var timeoutMs: Option[Int] = Some(30000)
   private[this] var handler: Option[WhenPageLoaded] = None
@@ -28,7 +28,8 @@ class WaitArg(var name: String = ""){
   private[this] var navigationMatcher:NavigationMatcher = NextPageReadyMatcher.instance
 
   def timeoutNone(): WaitArg = {this.timeoutMs = None; this}
-  def timeoutMs(i:Int): WaitArg = {this.timeoutMs = Some(i); this}
+  def timeoutMs(i: Int): WaitArg = {this.timeoutMs = Some(i); this}
+  def getTimeoutMs: Int = timeoutMs.getOrElse(wookie.options.defaultTimeoutMs)
   def timeoutSec(sec:Int): WaitArg = {this.timeoutMs = Some(sec * 1000);this}
   def whenLoaded(whenPageLoaded:WhenPageLoaded): WaitArg = {this.handler = Some(whenPageLoaded); this}
   def async(b: Boolean): WaitArg = {this.async = b; this}
@@ -71,11 +72,8 @@ class WaitArg(var name: String = ""){
   protected[wookie] def startedAtMs(t: Long): WaitArg = {this.startedAtMs = t; this}
 
   def isDue =
-    if(timeoutMs.isEmpty) {
-      false
-    } else {
-      startedAtMs + timeoutMs.get < System.currentTimeMillis()
-    }
+     startedAtMs + getTimeoutMs < System.currentTimeMillis()
+
 
   def toNavigationRecord:NavigationRecord = {
     new NavigationRecord(this, Promise[PageDoneEvent]())
