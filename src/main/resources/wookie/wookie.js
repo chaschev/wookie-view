@@ -68,6 +68,10 @@ var arrayFn = function($sel){
 };
 
 var directFn = function($sel){
+    if(!window.__javaToJS) {
+        alert("warning: directFn is undefined!");
+    }
+
     return window.__javaToJS;
 };
 
@@ -93,7 +97,7 @@ var jQueryFind = function(operationFn, $sel, $findSel){
     return operationFn($sel).find($findSel);
 };
 
-var jQuerySetValue = function(operationFn, $sel, name, value){
+var jQuerySetValue = function(operationFn, $sel, value){
     return operationFn($sel).val(value);
 };
 

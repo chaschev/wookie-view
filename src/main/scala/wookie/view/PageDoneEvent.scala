@@ -25,6 +25,8 @@ case class LoadTimeoutPageDoneEvent(override val arg: WaitArg) extends PageDoneE
 case class OkPageDoneEvent(
   wookieEvent: WookiePageStateChangedEvent, override val arg: WaitArg) extends PageDoneEvent(arg) {
   val ok = true
+
+  def url: String = wookieEvent.newLoc
 }
 
 case class NavigationRecord(arg: WaitArg, promise: Promise[PageDoneEvent]){

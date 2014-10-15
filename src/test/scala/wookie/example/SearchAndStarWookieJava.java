@@ -45,21 +45,21 @@ public class SearchAndStarWookieJava {
                 },
                 (wookiePanel, wookie, $) -> {
                     // google search result state
-                    wookie
-                        .waitForLocation(wookie.defaultArg("google search results")
-                            .matchByAddress((s) -> s.contains("q="))
-                            .whenLoaded(e -> {
-                                    System.out.println("results: " + $.apply("h3.r").asResultList());
+            wookie
+                .waitForLocation(wookie.defaultArg("google search results")
+                .matchByAddress((s) -> s.contains("q="))
+                .whenLoaded(e -> {
+                    System.out.println("results: " + $.apply("h3.r").asResultList());
 
-                                    //find our link in the results list and click it
-                                    JQueryWrapper githubLink = $.apply("h3.r a").asResultListJava()
-                                        .stream()
-                                        .filter((j) -> j.text().contains("chaschev"))
-                                        .findFirst().get();
+                    //find our link in the results list and click it
+                    JQueryWrapper githubLink = $.apply("h3.r a").asResultListJava()
+                        .stream()
+                        .filter((j) -> j.text().contains("chaschev"))
+                        .findFirst().get();
 
-                                    githubLink.followLink(null);
-                                }
-                            ));
+                    githubLink.followLink(null);
+                }
+                ));
 
                     // this matcher is the same as one of the following
                     // there is no problem, because matchers are removed when they are hit
@@ -98,10 +98,10 @@ public class SearchAndStarWookieJava {
                         }));
 
 
-                    // submit google request and start the scenario
-                $.apply("input[maxlength]")
-                        .value("wookie-view")
-                        .submit(null);
+// submit google request and start the scenario
+$.apply("input[maxlength]")
+        .value("wookie-view")
+        .submit(null);
                 }
             ));
     }

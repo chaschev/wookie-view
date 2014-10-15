@@ -9,13 +9,13 @@ import wookie.WookieScenarioLock.logger
 import wookie.view._
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.{Future, Await, Promise}
 import scala.util.Try
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
-
 class WookieScenarioLock(
   scenario: WookieSimpleScenario
 ){
@@ -82,12 +82,12 @@ class WookieScenarioContext(
 }
 
 trait WrapperUtils {
-  def wrapDomIntoJava(dom: JSObject, wookie: WookieView, url: String): JQueryWrapper = {
-    new DirectWrapper(true, dom, wookie, url, null)
+  def wrapDomIntoJava(dom: JSObject, wookie: WookieView, url: String, selector: Option[String] = None): JQueryWrapper = {
+    new DirectWrapper(true, dom, wookie, url, null, selector)
   }
 
-  def wrapJQueryIntoJava($: JSObject, wookie: WookieView, url: String): JQueryWrapper = {
-    new DirectWrapper(false, $, wookie, url, null)
+  def wrapJQueryIntoJava($: JSObject, wookie: WookieView, url: String, selector: Option[String] = None): JQueryWrapper = {
+    new DirectWrapper(false, $, wookie, url, null, selector)
   }
 }
 
@@ -175,26 +175,31 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
     lock.await()
   }
 
-  def download(matcher: NavigationMatcher) = {
-//    lock.acquire()
-
+  /**
+   * Script must be in a locked state when hook fires. It will unlock it when download finishes.
+   */
+  def addDownloadHook(matcher: NavigationMatcher): Future[DownloadResult] = {
     wookie
       .waitForDownloadToStart(matcher)
-//      .andThen({case _ => lock.wakeUp()})
-//
-//    lock.await()
+      .andThen({case _ => lock.wakeUp()})
   }
 
   def run()
 
   def asNotSimpleScenario = WookieSimpleScenario.asScenario(this)
 
+  /**
+   * A helper method to return Java's $ from a DOM element.
+   */
   def wrapDomIntoJava(dom: JSObject, url: String): JQueryWrapper = {
     createSimpleScenarioWrapperBridge(
       super.wrapDomIntoJava(dom, wookie, url), "", url
     )
   }
 
+  /**
+   * A helper method to return Java's $ from JS's $.
+   */
   def wrapJQueryIntoJava($: JSObject, url: String): JQueryWrapper = {
     createSimpleScenarioWrapperBridge(
       super.wrapJQueryIntoJava($, wookie, url), "", url

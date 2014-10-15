@@ -57,8 +57,7 @@ class JQueryWrapperBridge(delegate: JQueryWrapper)
 
   override def value(value: String): JQueryWrapper = { delegate.value(value); this }
 
-
-  override private[view] def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] = { delegate._jsJQueryToResultList(r) }
+  override private[view] def _jsJQueryToResultList(r: JSObject, findSelector: String): List[JQueryWrapper] = { delegate._jsJQueryToResultList(r, findSelector) }
 
   override private[view] def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] = { delegate._jsJQueryToDirectResultList(r) }
 
@@ -72,6 +71,8 @@ class JQueryWrapperBridge(delegate: JQueryWrapper)
 
   override def append(s: String): JQueryWrapper = { delegate.append(s); this }
 
+  override def asSelect(): SelectWrapper = delegate.asSelect()
+
   override def asResultList(): List[JQueryWrapper] = { delegate.asResultList() }
 
   override def asResultListJava(): JList[JQueryWrapper] = { delegate.asResultListJava() }
@@ -79,7 +80,9 @@ class JQueryWrapperBridge(delegate: JQueryWrapper)
   override def toString: String = delegate.toString
 }
 
-class DirectWrapper(isDom: Boolean = false, jsObject: JSObject,  wookie:WookieView, url: String, e: PageDoneEvent) extends CompositionJQueryWrapper("", wookie, url, e){
+class DirectWrapper(isDom: Boolean = false, jsObject: JSObject,  wookie:WookieView, url: String, e: PageDoneEvent, selector: Option[String])
+  extends CompositionJQueryWrapper(selector.getOrElse("<no-sel>"), wookie, url, e){
+
   val function = "directFn"
 
   private def assign() = {
@@ -154,11 +157,11 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   def find(findSelector: String): List[JQueryWrapper] = {
     val escapedFindSelector = StringEscapeUtils.escapeEcmaScript(findSelector)
 
-    _jsJQueryToResultList(interact(s"jQueryFind($function, '$escapedSelector', '$escapedFindSelector')").asInstanceOf[JSObject])
+    _jsJQueryToResultList(interact(s"jQueryFind($function, '$escapedSelector', '$escapedFindSelector')").asInstanceOf[JSObject], findSelector)
   }
 
   def parent(): List[JQueryWrapper] = {
-    _jsJQueryToResultList(interact(s"$function('$escapedSelector').parent()").asInstanceOf[JSObject])
+    _jsJQueryToResultList(interact(s"$function('$escapedSelector').parent()").asInstanceOf[JSObject], "parent")
   }
 
 
@@ -168,12 +171,12 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
   }
 
   def value(value:String): JQueryWrapper = {
-    interact(s"jQuerySetValue($function, '$escapedSelector').val('$value')")
+    interact(s"jQuerySetValue($function, '$escapedSelector', $value)")
     this
   }
 
 
-  private[view] def _jsJQueryToResultList(r: JSObject): List[JQueryWrapper] =
+  private[view] def _jsJQueryToResultList(r: JSObject, findSelector: String): List[JQueryWrapper] =
   {
     val l = r.getMember("length").asInstanceOf[Int]
 
@@ -189,7 +192,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
       val sObject = slot.asInstanceOf[JSObject]
 
-      list += new DirectWrapper(true, sObject, wookie, url, e)
+      list += new DirectWrapper(true, sObject, wookie, url, e, Some(s"$selector.find('$findSelector')[$i]"))
     }
 
     list.toList
@@ -204,7 +207,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     println(s"jQuery object, length=$l")
 
     for (i <- 0 until l) {
-      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie, url, e)
+      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie, url, e, Some(selector + "[" + i + "]"))
     }
 
     list.toList
@@ -260,7 +263,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
     val includeStuffLambda = () => {
       wookie.includeStuffOnPage(interactionId, url, Some(() => {
-        WookieView.logger.debug(s"executing $script")
+        WookieView.logger.debug(s"executing $script, selector: $selector")
         val r = wookie.getEngine.executeScript(script)
         promise.complete(Try(r))
         ()
@@ -280,13 +283,34 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     this
   }
 
+  def asSelect(): SelectWrapper = new SelectWrapper(this)
+
   def asResultList(): List[JQueryWrapper] = {
     val r = interact(s"$function('$escapedSelector')").asInstanceOf[JSObject]
 
-    _jsJQueryToResultList(r)
+    _jsJQueryToResultList(r, selector)
   }
 
   def asResultListJava(): JList[JQueryWrapper] = asResultList()
 
   override def toString: String = html()
+}
+
+class OptionWrapper(val selectWrapper: SelectWrapper, val optionWrapper: JQueryWrapper) {
+  def select(): Unit = selectWrapper.value(value())
+  def value(): String = optionWrapper.attr("value")
+  def text(): String = optionWrapper.text().trim
+}
+
+class SelectWrapper(wrapper: JQueryWrapper) extends JQueryWrapperBridge(wrapper) {
+  def findOption(criteria: JQueryWrapper => Boolean): Option[OptionWrapper] = {
+    wrapper.find("option").find(criteria).map(new OptionWrapper(this, _))
+  }
+
+  def findOptionByText(s: String): Option[OptionWrapper] =
+    findOption(_.text().trim == s)
+
+  def findOptionWithText(s: String): Option[OptionWrapper] =
+    findOption(_.text().trim contains s)
+
 }

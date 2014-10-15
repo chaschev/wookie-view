@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory
 import wookie._
 import wookie.view._
 
+import scala.concurrent.Future
+
 /**
  * @author Andrey Chaschev chaschev@gmail.com
  */
@@ -40,10 +42,8 @@ object DownloadJDKSimple {
               tryArchivePage(jQueryObj.isDefined, archiveUrl, wookie)
             }else{
               println(s"found the link at ${latestUrl.get}, download should start...")
-              enableLocking(false)
-              downloadJDKHook()
+              addDownloadJDKHook()
               jQueryObj.get.followLink()
-              enableLocking(true)
             }
           } else {
             tryArchivePage(found = false, archiveUrl, wookie)
@@ -51,18 +51,22 @@ object DownloadJDKSimple {
         }
 
         protected def loginAndDownload(){
-          logger.info(s"signon form: ${$("#sso_username")}")
+          if(context.lastEvent.get.asInstanceOf[OkPageDoneEvent].wookieEvent.newLoc.contains("download")){
+            logger.info("there was a download, which must have already finished")
+          } else {
+            logger.info(s"signon form: ${$("#sso_username")}")
 
-          $("#sso_username").value(login)
-          $("#ssopassword").value(password)
+            $("#sso_username").value(login)
+            $("#ssopassword").value(password)
 
-          $(".submit_btn").followLink()
+            $(".submit_btn").followLink()
+          }
 
-          downloadJDKHook()
+          load("http://google.com")
         }
 
-        protected def downloadJDKHook() = {
-          download(new LocationMatcher(loc =>
+        protected def addDownloadJDKHook(): Future[view.DownloadResult] = {
+          addDownloadHook(new LocationMatcher(loc =>
             loc.contains("download.oracle.com") && loc.contains("?")
           ))
         }
@@ -93,22 +97,22 @@ object DownloadJDKSimple {
               if (link.isDefined) {
                 logger.info("found a link, will be redirected to the login page...")
 
-                downloadJDKHook()
+                addDownloadJDKHook()
 
                 // if there is a download, it will start and lock will freeze execution here
                 // if there is no download, it will continue to the login form
                 link.get.followLink()
                 loginAndDownload()
               } else {
-                //todo fixme complete download promise
-                //          downloadPromise.complete(Try(new DownloadResult(None, "didn't find a link", false)))
+                // todo fixme complete download promise
+                // downloadPromise.complete(Try(new DownloadResult(None, "didn't find a link", false)))
               }
             } else {
               logger.error("could not find a link")
             }
           else {
             logger.info("download started...")
-            downloadJDKHook()
+            addDownloadJDKHook()
           }
         }
 

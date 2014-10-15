@@ -219,7 +219,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
       Option(webEngine.getDocument.getDocumentURI)
   }
 
-  def waitForDownloadToStart(matcher: NavigationMatcher): SFuture[DownloadResult] = {
+  def waitForDownloadToStart(matcher: NavigationMatcher, whenLoaded: Option[WhenPageLoaded] = None): SFuture[DownloadResult] = {
     val downloadPromise = Promise[DownloadResult]()
 
     waitForLocation(defaultArg(name = "wait for download")
@@ -228,7 +228,10 @@ class WookieView(builder: WookieBuilder) extends Pane {
       .filterEvents(e => e.isInstanceOf[LocationChangedEvent])
       .whenLoaded(new WhenPageLoaded {
       override def apply()(implicit event: PageDoneEvent): Unit = {
-        //copy-pasted magic
+        if(whenLoaded.isDefined) {
+          whenLoaded.get.apply()
+        }
+
         val navEvent = event.asInstanceOf[OkPageDoneEvent]
 
         val uri = navEvent.wookieEvent.newLoc
@@ -614,7 +617,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]
 
-    new DirectWrapper(false, $obj, this, url, e)
+    new DirectWrapper(false, $obj, this, url, e, Some(jQuerySelector))
   }
 
   def createJSupplier(url: Option[String], e: Option[PageDoneEvent]) = {
