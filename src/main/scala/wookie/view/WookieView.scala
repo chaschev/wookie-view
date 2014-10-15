@@ -24,7 +24,7 @@ import org.apache.commons.lang3.{StringEscapeUtils, StringUtils}
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
-import wookie.JQuerySupplier
+import wookie.{WookieScenario, JQuerySupplier}
 import wookie.view.WookieView.logger
 
 import scala.collection.JavaConversions._
@@ -607,6 +607,8 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
   def getHTML: String = webEngine.executeScript("document.getElementsByTagName('html')[0].innerHTML").asInstanceOf[String]
 
+  private[wookie] var currentScenario: WookieScenario = null
+
   /**
    * Todo: change into a wrapper object with methods: html(), text(), attr()
    * @param jQuerySelector
@@ -617,7 +619,16 @@ class WookieView(builder: WookieBuilder) extends Pane {
 
     val $obj = getEngine.executeScript(s"jQuery('$sel')").asInstanceOf[JSObject]
 
-    new DirectWrapper(false, $obj, this, url, e, Some(jQuerySelector))
+    //todo this should be extracted into factory ?
+    currentScenario.wrapJQueryIntoJava($obj, this, url, Some(jQuerySelector), e)
+  }
+
+  def wrapDomIntoJava(dom: JSObject, url: String, selector: Option[String] = None, e: PageDoneEvent): JQueryWrapper = {
+    currentScenario.wrapDomIntoJava(dom, this, url, selector, e)
+  }
+
+  def wrapJQueryIntoJava($: JSObject, url: String, selector: Option[String] = None, e: PageDoneEvent): JQueryWrapper = {
+    currentScenario.wrapJQueryIntoJava($, this, url, selector, e)
   }
 
   def createJSupplier(url: Option[String], e: Option[PageDoneEvent]) = {
@@ -634,5 +645,11 @@ class WookieView(builder: WookieBuilder) extends Pane {
     }
   }
 
+  def wrapJQuery(delegate: JQueryWrapper, selector:String, url: String): JQueryWrapper = {
+    currentScenario.bridgeJQueryWrapper(delegate, selector, url)
+  }
+
+
   def defaultArg(name: String = ""): WaitArg = new WaitArg(name = name, wookie = this).timeoutMs(options.defaultTimeoutMs)
+
 }

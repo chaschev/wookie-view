@@ -182,8 +182,6 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
     val list = new mutable.MutableList[JQueryWrapper]
 
-    println(s"jQuery object, length=$l")
-
     for (i <- 0 until l) {
       //      list += new ArrayItemJQueryWrapper(selector, i, wookie)
       val slot = r.getSlot(i)
@@ -192,7 +190,9 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
       val sObject = slot.asInstanceOf[JSObject]
 
-      list += new DirectWrapper(true, sObject, wookie, url, e, Some(s"$selector.find('$findSelector')[$i]"))
+      list += wookie.wrapDomIntoJava(
+        sObject, url, Some(s"$selector.find('$findSelector')[$i]"), e
+      )
     }
 
     list.toList
@@ -200,17 +200,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
   private[view] def _jsJQueryToDirectResultList(r: JSObject): List[JQueryWrapper] =
   {
-    val l = r.getMember("length").asInstanceOf[Int]
-
-    val list = new mutable.MutableList[JQueryWrapper]
-
-    println(s"jQuery object, length=$l")
-
-    for (i <- 0 until l) {
-      list += new DirectWrapper(true, r.getSlot(l).asInstanceOf[JSObject], wookie, url, e, Some(selector + "[" + i + "]"))
-    }
-
-    list.toList
+    ???
   }
 
   def pressKey(code:Int): JQueryWrapper = {
@@ -290,6 +280,19 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
     _jsJQueryToResultList(r, selector)
   }
+
+  def findResult(findSelector: String, criteria: JQueryWrapper => Boolean): Option[JQueryWrapper] = {
+    find(findSelector).find(criteria)
+  }
+
+  def findWithText(findSelector: String, text: String): Option[JQueryWrapper] =
+    findResult(findSelector, _.text().contains(text))
+
+  def findResult(criteria: JQueryWrapper => Boolean): Option[JQueryWrapper] =
+    asResultList().find(criteria)
+
+  def findResultWithText(text: String): Option[JQueryWrapper] =
+    findResult(_.text().contains(text))
 
   def asResultListJava(): JList[JQueryWrapper] = asResultList()
 

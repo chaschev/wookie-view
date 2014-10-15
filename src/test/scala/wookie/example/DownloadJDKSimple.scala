@@ -82,7 +82,7 @@ object DownloadJDKSimple {
             if(jQueryObj == null)
               None
             else
-              Some(wrapDomIntoJava(jQueryObj, archiveUrl))
+              Some(wrapDomIntoJava(jQueryObj, wookie, archiveUrl))
           } catch {
             case e: Exception => e.printStackTrace()
               None

@@ -84,7 +84,7 @@ var newFindFn = function($rootSel, $findSel){
 var jQueryAggregate = function(operationFn, $sel, initialValue, aggregator){
     var r = operationFn($sel);
 
-    var result = initialValue
+    var result = initialValue;
 
     r.each(function(index, el){
         result = aggregator(result, index, el);
@@ -142,6 +142,8 @@ var jQueryAttrs = function(operationFn, $sel){
 //};
 
 var jQuery_text = function(operationFn, $sel, isHtml){
+//    alert('jQuery_text, operationFn: ' + operationFn + ", sel: " + $sel + ", isHtml: " + isHtml);
+
     return jQueryAggregate(operationFn, $sel, '', function(r, i, el){
         if(isHtml) {
             return r + el.outerHTML + "\n";

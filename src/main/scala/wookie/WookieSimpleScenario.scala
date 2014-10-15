@@ -82,13 +82,19 @@ class WookieScenarioContext(
 }
 
 trait WrapperUtils {
-  def wrapDomIntoJava(dom: JSObject, wookie: WookieView, url: String, selector: Option[String] = None): JQueryWrapper = {
-    new DirectWrapper(true, dom, wookie, url, null, selector)
+  def wrapDomIntoJava(dom: JSObject, wookie: WookieView, url: String, selector: Option[String] = None, e: PageDoneEvent = null): JQueryWrapper = {
+    bridgeJQueryWrapper(
+      new DirectWrapper(true, dom, wookie, url, e, selector), selector.getOrElse("<none>"), url
+    )
   }
 
-  def wrapJQueryIntoJava($: JSObject, wookie: WookieView, url: String, selector: Option[String] = None): JQueryWrapper = {
-    new DirectWrapper(false, $, wookie, url, null, selector)
+  def wrapJQueryIntoJava($: JSObject, wookie: WookieView, url: String, selector: Option[String] = None, e: PageDoneEvent = null): JQueryWrapper = {
+    bridgeJQueryWrapper(
+      new DirectWrapper(false, $, wookie, url, e, selector), selector.getOrElse("<none>"), url
+    )
   }
+
+  private[wookie] def bridgeJQueryWrapper(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper
 }
 
 abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
@@ -115,7 +121,7 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
     Await.result(promise.future, Duration(5, "s"))
   }
 
-  private[this] def createSimpleScenarioWrapperBridge(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper = {
+  override private[wookie] def bridgeJQueryWrapper(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper = {
     // this mess redirects all calls to the default JQueryWrapper
     // and for three specific cases of following the links it adds locking/unlocking
     new JQueryWrapperBridge(delegate) {
@@ -123,7 +129,12 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
       override def followLink(arg: WaitArg): JQueryWrapper = {
         lock.acquire()
         val r = super.followLink(whenLoadedForSimpleScenario(url))
+
+        logger.debug("awaiting!")
+
         lock.await()
+
+        logger.debug("woke up!")
         r
       }
 
@@ -143,7 +154,7 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
 
       override def asResultList(): List[JQueryWrapper] = {
         super.asResultList().map { $ =>
-          createSimpleScenarioWrapperBridge($, selector, url)
+          wookie.wrapJQuery($, selector, url)
         }
       }
     }
@@ -156,7 +167,7 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
         context.lastEvent = Some(e)
         context.last$ = Some(new JQuerySupplier {
           override def apply(selector: String): JQueryWrapper = {
-            createSimpleScenarioWrapperBridge(wookie.createJWrapper(selector, url), selector, url)
+            wookie.createJWrapper(selector, url)
           }
         })
 
@@ -188,23 +199,19 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
 
   def asNotSimpleScenario = WookieSimpleScenario.asScenario(this)
 
-  /**
-   * A helper method to return Java's $ from a DOM element.
-   */
-  def wrapDomIntoJava(dom: JSObject, url: String): JQueryWrapper = {
-    createSimpleScenarioWrapperBridge(
-      super.wrapDomIntoJava(dom, wookie, url), "", url
-    )
-  }
-
-  /**
-   * A helper method to return Java's $ from JS's $.
-   */
-  def wrapJQueryIntoJava($: JSObject, url: String): JQueryWrapper = {
-    createSimpleScenarioWrapperBridge(
-      super.wrapJQueryIntoJava($, wookie, url), "", url
-    )
-  }
+//  /**
+//   * A helper method to return Java's $ from a DOM element.
+//   */
+//  def wrapDomIntoJava(dom: JSObject, url: String, selector: Option[String] = None, e: PageDoneEvent): JQueryWrapper = {
+//    wookie.wrapDomIntoJava(dom, url, selector, e)
+//  }
+//
+//  /**
+//   * A helper method to return Java's $ from JS's $.
+//   */
+//  def wrapJQueryIntoJava($: JSObject, url: String, selector: Option[String] = None, e: PageDoneEvent): JQueryWrapper = {
+//    wookie.wrapJQueryIntoJava($, url, selector, e)
+//  }
   
   def enableLocking(b: Boolean): Unit = locksEnabled = b
 }
@@ -214,7 +221,8 @@ object WookieSimpleScenario {
     new WookieScenario(s.title, None, s.panel, (p, wv, js) => {
       s.wookie = wv
       s.run()
-    })
+    }) {
+      override private[wookie] def bridgeJQueryWrapper(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper = s.bridgeJQueryWrapper(delegate, selector, url)
+    }
   }
-
 }

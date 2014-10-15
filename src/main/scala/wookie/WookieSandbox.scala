@@ -111,12 +111,13 @@ class WookieSandboxApp extends Application {
 
         val wookie = panel.wookie
 
+        wookie.currentScenario = ws
+
         new Thread(new Runnable {
           override def run(): Unit = {
             if(ws.url.isDefined) {
               wookie.load(ws.url.get, new WhenPageLoaded {
                 override def apply()(implicit e: PageDoneEvent): Unit = {
-
                   ws.procedure(panel, wookie, wookie.createJSupplier(Some(ws.url.get), Some(e)))
                 }
               })
