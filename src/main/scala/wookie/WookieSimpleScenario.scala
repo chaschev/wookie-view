@@ -44,13 +44,13 @@ class WookieScenarioLock(
 
   def acquire(): Unit = {
     if(!scenario.locksEnabled) return
-    
+
+    logger.debug(s"-1 (${semaphore.availablePermits()}) - before the lock", new Exception)
+
     if(!semaphore.tryAcquire()){
       logger.warn("warning: second lock!", new Exception)
       semaphore.acquire()
     }
-
-    logger.debug(s"-1 (${semaphore.availablePermits()})", new Exception)
   }
 
   def wakeUp(): Unit = {
@@ -69,8 +69,6 @@ class WookieScenarioLock(
 object WookieScenarioLock {
   val logger = LoggerFactory.getLogger(classOf[WookieScenarioLock])
 }
-
-
 
 class WookieScenarioContext(
   @volatile
@@ -121,44 +119,51 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
     Await.result(promise.future, Duration(5, "s"))
   }
 
-  override private[wookie] def bridgeJQueryWrapper(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper = {
-    // this mess redirects all calls to the default JQueryWrapper
-    // and for three specific cases of following the links it adds locking/unlocking
-    new JQueryWrapperBridge(delegate) {
-      //ok they ignore the input argument which is not good
-      override def followLink(arg: WaitArg): JQueryWrapper = {
-        lock.acquire()
-        val r = super.followLink(whenLoadedForSimpleScenario(url))
+  // this mess redirects all calls to the default JQueryWrapper
+  // and for three specific cases of following the links it adds locking/unlocking
+  class SimpleScenarioBridge (delegate: JQueryWrapper, selector: String, url: String)
+    extends JQueryWrapperBridge(delegate) {
+    //ok they ignore the input argument which is not good
+    override def followLink(arg: WaitArg): JQueryWrapper = {
+      lock.acquire()
+      val r = super.followLink(whenLoadedForSimpleScenario(url))
 
-        logger.debug("awaiting!")
+      logger.debug("awaiting!")
 
-        lock.await()
+      lock.await()
 
-        logger.debug("woke up!")
-        r
-      }
-
-      override def mouseClick(arg: WaitArg): JQueryWrapper = {
-        lock.acquire()
-        val r = super.mouseClick(whenLoadedForSimpleScenario(url))
-        lock.await()
-        r
-      }
-
-      override def submit(arg: WaitArg): JQueryWrapper = {
-        lock.acquire()
-        val r = super.submit(whenLoadedForSimpleScenario(url))
-        lock.await()
-        r
-      }
-
-      override def asResultList(): List[JQueryWrapper] = {
-        super.asResultList().map { $ =>
-          wookie.wrapJQuery($, selector, url)
-        }
-      }
+      logger.debug("woke up!")
+      r
     }
 
+    override def mouseClick(arg: WaitArg): JQueryWrapper = {
+      lock.acquire()
+      val r = super.mouseClick(whenLoadedForSimpleScenario(url))
+      lock.await()
+      r
+    }
+
+    override def submit(arg: WaitArg): JQueryWrapper = {
+      lock.acquire()
+      val r = super.submit(whenLoadedForSimpleScenario(url))
+      lock.await()
+      r
+    }
+
+    override def asResultList(): List[JQueryWrapper] = {
+      super.asResultList().map { $ =>
+        wookie.wrapJQuery($, selector, url)
+      }
+    }
+  }
+
+  override private[wookie] def bridgeJQueryWrapper(delegate: JQueryWrapper, selector: String, url: String): JQueryWrapper = {
+    if(delegate.isInstanceOf[SimpleScenarioBridge]) {
+      logger.warn("trying to double wrap!", new Exception)
+      delegate
+    }else {
+      new SimpleScenarioBridge(delegate, selector, url)
+    }
   }
 
   private[this] def whenLoadedForSimpleScenario(url: String): WaitArg = {

@@ -106,6 +106,18 @@ class DirectWrapper(isDom: Boolean = false, jsObject: JSObject,  wookie:WookieVi
   }
 }
 
+/**
+ * The Java wrapper for JavaScript's jQuery object. Meant to have several implementations, but
+ * at the moment only a direct implementation is used.
+ *
+ * There is a bridge (JQueryWrapperBridge) which is used to create extensions-wrappers for it. I.e. for a <select>/<option> tags.
+ *
+ * There is also a simple version of the scripts which needs to modify the behaviour of the wrapper: to make change-locations
+ * commands sync. In this case I use the scheme:
+ *   SimpleScriptBridge -> followLink -> wookie.wrapJQuery -> currentScenario -> bridgeJQueryWrapper
+ *   Basically, wookie scripts decides how to wrap JQuery - it delegates this to the current scenario. Current scenario
+ *   still uses wookie, it doesn't call itself to wrap an object - because i.e. wookie could use another wrapper, not just scenario wrapper.
+ */
 abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val url: String, val e: PageDoneEvent){
   val function: String
 
@@ -166,12 +178,12 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
 
 
   def attr(name:String, value:String):JQueryWrapper = {
-    interact(s"jQuerySetAttr($function, '$escapedSelector', '$name', '$value')")
+    interact(s"jQuerySetAttr($function, '$escapedSelector', '$name', '${StringEscapeUtils.escapeEcmaScript(value)}')")
     this
   }
 
   def value(value:String): JQueryWrapper = {
-    interact(s"jQuerySetValue($function, '$escapedSelector', $value)")
+    interact(s"jQuerySetValue($function, '$escapedSelector', '${StringEscapeUtils.escapeEcmaScript(value)}')")
     this
   }
 
