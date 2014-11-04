@@ -14,7 +14,7 @@ WookieView is made to simplify WebView usage and replace Selenium in some of the
 
 ## How to open this project in IDE
 
-To open a project in your IDE, you just import it as a Maven project.
+To open a project in your IDE, just import it as a Maven project.
 
 ## Code Examples
 
@@ -40,10 +40,12 @@ $("a.button.signin").followLink()
 
 #### Submit a form
 
+```java
 // fill login data at the login page
 $("#login_field").value(login)
 $("#password").value(password)
   .submit()
+```
 
 #### Configuring the WookieView
 
