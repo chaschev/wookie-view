@@ -24,21 +24,27 @@ Code examples can be found in an [example folder](https://github.com/chaschev/wo
 #### Search Google
 
 ```java
+load("http://www.google.com")
+
 $("input[maxlength]")
-    .value("wookie-view")
-    .submit();
+  .value("wookie-view")
+  .submit() // execution is blocked here during submit()
+
+println("results: " + $("h3.r").asResultList)
 ```
 
 #### Click 'Sign In' button at GitHub
 
 ```java
-wookie
-    .waitForLocation(new WaitArg("git wookie not logged in")
-    .matchByAddress((s) -> s.contains("/wookie-view"))
-    .whenLoaded(e -> {
-        $.apply("a.button.signin", e).clickLink();
-    }))
+$("a.button.signin").followLink()
 ```
+
+#### Submit a form
+
+// fill login data at the login page
+$("#login_field").value(login)
+$("#password").value(password)
+  .submit()
 
 #### Configuring the WookieView
 
@@ -54,37 +60,24 @@ WookieView wookieView = WookieView.newBuilder
 #### Follow a link after a Google Search query
    
 ```java
-// Wait for Google Search results page to load
-wookie
-    .waitForLocation(new WaitArg("google search results")
-    .matchByAddress((s) -> s.contains("q="))
-    .whenLoaded(e -> {
-        System.out.println("results: " + $.apply("h3.r", e).asResultList());
+load("http://www.google.com")
 
-        // find our link in the results list and click it
-        // in Scala the selector would be shorter: $("h3.r a")
-        JQueryWrapper githubLink = $.apply("h3.r a", e).asResultListJava()
-            .stream()
-            .filter((j) -> j.text().contains("chaschev"))
-            .findFirst().get();
+$("input[maxlength]")
+  .value("wookie-view")
+  .submit()
 
-        githubLink.clickLink();
-    }));
-  
-// Search Google
-$.apply("input[maxlength]", null)
-    .value("wookie-view")
-    .submit();
+System.out.println("results: " + $("h3.r").asResultList)
+
+// get the list of result links with CSS selector,
+// find a link in it and follow it
+$("h3.r a").asResultList().find(_.text().contains("chaschev")).get.followLink()
 ```
 
 #### Download a file (Scala)
 
 ```scala
-wookie.waitForDownloadToStart(
-  new LocationMatcher(loc =>
+addDownloadHook(new LocationMatcher(loc =>
     loc.contains("download.oracle.com") && loc.contains("?")
-  )
-).andThen({ case result =>
-  logger.info(s"download done: $result")
-})
+))
+downloadLink.get.followLink()
 ```
