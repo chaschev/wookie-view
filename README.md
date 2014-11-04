@@ -1,21 +1,20 @@
 wookie-view
 ===========
 
-WookieView allows you to automatize web browsing – i.e. to search with Google Search, visit you Facebook, download files. For people who are familiar with Selenium it is can a lightweight alternative to Selenium. It has very few external dependencies and uses WebView from JDK 8 to render pages.
+WookieView is made to simplify WebView usage and replace Selenium in some of the tasks, maybe. With WookieView you can easily automatize web browsing operations like searching with Google Search, visiting your Facebook page with your login and password, crawling through a forum and downloading files. WookieView is pure JDK, it uses a few Java libraries and can be seen as a lightweight version of Selenium.
 
-## Features:
+## Features
 
 * Concise syntax
 * JQuery support
 * Embedding scripts into existing pages (i.e. jQuery, Firebug, your manual JS scripts)
 * File downloads
 * Scala & Java 8 support
+* Simple plain script and event-driven API
 
 ## How to open this project in IDE
 
-To open a project in your IDE, you might import it as a Maven project.
-
-Maven artifacts are coming if the project gets popular.
+To open a project in your IDE, you just import it as a Maven project.
 
 ## Code Examples
 
@@ -81,3 +80,11 @@ addDownloadHook(new LocationMatcher(loc =>
 ))
 downloadLink.get.followLink()
 ```
+
+## Questions, etc
+
+Just msg me or mail me, I will respond as quickly as I can.
+
+## Maven artifacts
+
+I will publish this project to Maven Central if gets enough attention.
