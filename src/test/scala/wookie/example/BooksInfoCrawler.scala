@@ -3,8 +3,9 @@ package wookie.example
 import java.io.File
 import java.net.URLEncoder
 
+import chaschev.lang.LangUtils.toConciseString
 import org.apache.commons.io.FilenameUtils
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.StringUtils.{substringBefore, substringBetween}
 import wookie.example.SimpleCrawlerState._
 import wookie.{WookiePanel, WookieSandboxApp, WookieSimpleScenario}
 
@@ -28,6 +29,7 @@ case class BooksEntry(
   file: String,
   amazonBook: Option[BookLink],
   goodReadsBook: Option[BookLink],
+  barnesBook: Option[BookLink],
   _state: SimpleCrawlerState = NOT_STARTED,
   _comment: String = ""
 ) extends SimpleCrawlerEntry(_state, _comment) {
@@ -66,14 +68,15 @@ object BooksInfoCrawler {
             }
 
             def getRatings: BooksEntry = {
-              load(s"http://www.amazon.com/s/ref=nb_sb_noss_2?url=search-alias%3Daps&field-keywords=${URLEncoder.encode(FilenameUtils.getBaseName(bookFile.getName), "UTF-8")}")
+              val encodedRequest = URLEncoder.encode(FilenameUtils.getBaseName(bookFile.getName), "UTF-8")
+
+              load(s"http://www.amazon.com/s/ref=nb_sb_noss_2?url=search-alias%3Daps&field-keywords=${encodedRequest}")
 
               val amazonLink = {
-
-
                 val amazonResults = $("li.s-result-item").asResultList()
+
                 if (amazonResults.isEmpty || $("body").html().contains("did not match any products")) {
-                  throw new CrawlException("no results for " + bookFile.getName)
+                  None
                 } else {
                   amazonResults.find {
                     _.find("i.a-icon-star > .a-icon-alt").nonEmpty
@@ -82,14 +85,91 @@ object BooksInfoCrawler {
                       new BookLink(
                         title = amazonResultDiv.find("h2.s-access-title")(0).trimmedText(),
                         link = amazonResultDiv.find("a.s-access-detail-page")(0).trimmedText(),
-                        rating = StringUtils.substringBefore(amazonResultDiv.find("i.a-icon-star > .a-icon-alt")(0).text(), " ").toDouble,
+                        rating = substringBefore(amazonResultDiv.find("i.a-icon-star > .a-icon-alt")(0).text(), " ").toDouble,
                         raters = amazonResultDiv.find(".a-span5 > .a-spacing-mini a.a-size-small.a-link-normal")(0).trimmedText().toInt
                       )
                   }
                 }
               }
 
-              new BooksEntry(bookFile.getCanonicalPath, amazonLink, None, FINISHED)
+//              val amazonLink = None
+
+              load(s"https://www.goodreads.com/search?utf8=%E2%9C%93&query=$encodedRequest")
+
+              val goodreadsLink = {
+                val goodreadsResults = $(".tableList > tbody > tr").asResultList()
+
+                if (goodreadsResults.isEmpty || $("body").html().contains("No results found - sorry")) {
+                  None
+                } else {
+                  goodreadsResults.find { goodreadsResultDiv =>
+                    val miniRating = goodreadsResultDiv.find(".minirating")
+
+                    miniRating.nonEmpty && !miniRating(0).trimmedText().startsWith("0.0")
+                  } .map {
+                    goodreadsResultDiv =>
+                      val ratingString = goodreadsResultDiv.find(".minirating")(0).trimmedText()
+
+                      val rating = substringBefore(ratingString, " ").toDouble
+                      val raters = substringBetween(ratingString, "— ", " ratings").replaceAll(",", "").toInt
+
+                      new BookLink(
+                        title = goodreadsResultDiv.find("a.bookTitle")(0).trimmedText(),
+                        link = goodreadsResultDiv.find("a.bookTitle")(0).attr("href"),
+                        rating = rating,
+                        raters = raters
+                      )
+                  }
+                }
+
+              }
+
+//              val goodreadsLink = None
+
+              load(s"http://www.barnesandnoble.com/s/$encodedRequest")
+
+              if(wookie.getCurrentDocUri.getOrElse("noresults").contains("noresults")
+                && !wookie.isPageReady) {
+                waitForPageReady()
+              }
+
+              val barnesLink = {
+                val barnesResults = $(".result.box").asResultList()
+
+                val body = $("body").html()
+                if (barnesResults.isEmpty
+                  || body.contains("Sorry, we could not find what you were looking for.")
+                  || body.contains("Please try another search or browse")) {
+                  None
+                } else {
+                  barnesResults.find {
+                    _.find(".stars-small").nonEmpty
+                  } .map {
+                    barnesResultDiv =>
+                      val ratingString = barnesResultDiv.find(".stars-small")(0).attr("title")
+
+                      val rating = toConciseString(substringBetween(ratingString, "of ", " ").toDouble, 2) .toDouble
+
+                      val titleLink = barnesResultDiv.find("a.title")(0)
+
+                      val title = titleLink.trimmedText()
+                      val link = titleLink.attr("href")
+
+                      titleLink.followLink()
+
+                      val raters = substringBefore($(".starDisplay > .total > a").trimmedText(), "\n").trim.toInt
+
+                      new BookLink(
+                        link = link,
+                        title = title,
+                        rating = rating,
+                        raters = raters
+                      )
+                  }
+                }
+              }
+
+              new BooksEntry(bookFile.getCanonicalPath, amazonLink, goodreadsLink, barnesLink, FINISHED)
             }
 
             try {
@@ -102,7 +182,6 @@ object BooksInfoCrawler {
 
                     val newEntry = getRatings
 
-
                     crawler.state.entries += newEntry
                   case _ =>
                 }
@@ -113,7 +192,7 @@ object BooksInfoCrawler {
             }
             catch {
               case e: CrawlException =>
-                crawler.state.entries += new BooksEntry(bookFile.getCanonicalPath, None, None, FAILED, e.toString)
+                crawler.state.entries += new BooksEntry(bookFile.getCanonicalPath, None, None, None, FAILED, e.toString)
             } finally {
               crawler.saveState()
             }
