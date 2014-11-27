@@ -8,6 +8,7 @@ import java.util.{Set => JSet}
 import javafx.application.Platform
 import javafx.beans.value.{ChangeListener, ObservableValue}
 import javafx.concurrent.Worker
+import javafx.concurrent.Worker.State
 import javafx.event.EventHandler
 import javafx.scene.control.{Label, ProgressBar}
 import javafx.scene.layout.Pane
@@ -24,7 +25,7 @@ import org.apache.commons.lang3.{StringEscapeUtils, StringUtils}
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
 import org.slf4j.LoggerFactory
-import wookie.{WookieScenario, JQuerySupplier}
+import wookie.{FXUtils, WookieScenario, JQuerySupplier}
 import wookie.view.WookieView.logger
 
 import scala.collection.JavaConversions._
@@ -176,7 +177,7 @@ class WookieView(builder: WookieBuilder) extends Pane {
           }))
         } else
         if(newState == Worker.State.FAILED || newState == Worker.State.FAILED ){
-          logger.warn(s"worker state is $newState for ${webEngine.getDocument.getDocumentURI}")
+          logger.warn(s"worker state is $newState for ${getCurrentDocUri.getOrElse("<empty uri>")}")
         } else {
           logger.debug(s"worker state -> $newState")
         }
@@ -217,6 +218,12 @@ class WookieView(builder: WookieBuilder) extends Pane {
       None
     else
       Option(webEngine.getDocument.getDocumentURI)
+  }
+
+  def isPageReady: Boolean = {
+    FXUtils.execInFxAndAwait(() => {
+      webEngine.getLoadWorker.getState == State.SUCCEEDED
+    }, 1000)
   }
 
   def waitForDownloadToStart(matcher: NavigationMatcher, whenLoaded: Option[WhenPageLoaded] = None): SFuture[DownloadResult] = {
@@ -399,6 +406,8 @@ class WookieView(builder: WookieBuilder) extends Pane {
    * Waits for a location to change. Just adds a record to an arrays which is scanned with periods of time.
    */
   def waitForLocation(arg: WaitArg): NavigationRecord = {
+    logger.info(s"waiting for location, arg=$arg, current location: ${webEngine.getLocation}")
+
     val record: NavigationRecord = arg.startedAtMs(System.currentTimeMillis()).toNavigationRecord
 
     navigationRecords.add(record)

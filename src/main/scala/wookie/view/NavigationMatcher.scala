@@ -19,11 +19,7 @@ case class LocationMatcher(p: ((String) => Boolean)) extends NavigationMatcher{
   }
 }
 
-object NextPageReadyMatcher{
-  val instance = new NextPageReadyMatcher
-}
-
-case class NextPageReadyMatcher() extends NavigationMatcher {
+object NextPageReadyMatcher extends NavigationMatcher {
   override def matches(r: NavigationRecord, w: WookieNavigationEvent): Boolean = {
     w.isInstanceOf[PageReadyEvent]
   }

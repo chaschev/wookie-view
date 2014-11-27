@@ -2,7 +2,6 @@ package wookie.view
 
 import java.util.concurrent.TimeoutException
 import java.util.{List => JList}
-import javafx.concurrent.Worker.State
 
 import netscape.javascript.JSObject
 import org.apache.commons.lang3.StringEscapeUtils
@@ -11,7 +10,7 @@ import wookie.FXUtils
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Future, Await, Promise}
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Random, Try}
 
 
@@ -135,6 +134,8 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
     interact(s"jQuery_text($function, '$escapedSelector', false)".toString).asInstanceOf[String]
   }
 
+  def trimmedText(): String = text().trim
+
   def html(): String = {
     interact(s"jQuery_text($function, '$escapedSelector', true)".toString).asInstanceOf[String]
   }
@@ -252,7 +253,7 @@ abstract class JQueryWrapper(val selector: String, val wookie: WookieView, val u
       WookieView.logger.warn(s"warning - interaction is called for timeout event! The result might not be successful!")
     }
 
-    if(wookie.getEngine.getLoadWorker.getState != State.SUCCEEDED) {
+    if(!wookie.isPageReady) {
       WookieView.logger.warn(s"warning - interaction is called in non-succeeded state: ${wookie.getEngine.getLoadWorker.getState} for interact script $script, interactionId=TODO")
     }
 

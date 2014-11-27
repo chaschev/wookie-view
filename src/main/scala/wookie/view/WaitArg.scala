@@ -25,7 +25,7 @@ class WaitArg(var name: String = "", val wookie: WookieView){
   var startedAtMs: Long = -1
   var location: Option[String] = if(name.equals("")) None else Some(name)
 
-  private[this] var navigationMatcher:NavigationMatcher = NextPageReadyMatcher.instance
+  private[this] var navigationMatcher: NavigationMatcher = NextPageReadyMatcher
 
   def timeoutNone(): WaitArg = {this.timeoutMs = None; this}
   def timeoutMs(i: Int): WaitArg = {this.timeoutMs = Some(i); this}
@@ -45,8 +45,8 @@ class WaitArg(var name: String = "", val wookie: WookieView){
   def matchByAddress(p: JFunction[String, JBoolean]): WaitArg =
     withMatcher(new LocationMatcher(p.apply))
 
-  def matchIfPageReady(_location:String): WaitArg = {
-    this.navigationMatcher = NextPageReadyMatcher.instance; this
+  def matchIfPageReady(): WaitArg = {
+    this.navigationMatcher = NextPageReadyMatcher; this
   }
 
   def filterEvents(eventFilter: (WookiePageStateChangedEvent) => Boolean): WaitArg = {this.eventFilter = Some(eventFilter); this}

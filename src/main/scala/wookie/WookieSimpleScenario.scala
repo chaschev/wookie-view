@@ -166,6 +166,8 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
     }
   }
 
+  def newArg(url: String): WaitArg = whenLoadedForSimpleScenario(url)
+
   private[this] def whenLoadedForSimpleScenario(url: String): WaitArg = {
     val whenLoaded = new WhenPageLoaded {
       override def apply()(implicit e: PageDoneEvent): Unit = {
@@ -183,10 +185,34 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
     wookie.defaultArg().whenLoaded(whenLoaded)
   }
 
+  def load(arg: WaitArg) = {
+    lock.acquire()
+
+    wookie.load(arg.location.get, arg)
+
+    lock.await()
+  }
+
+
   def load(url: String) = {
     lock.acquire()
 
     wookie.load(url, whenLoadedForSimpleScenario(url))
+
+    lock.await()
+  }
+
+  /**
+   * TODO: there must be a way to check if the page is not ready, ideally, atomic way
+   */
+  def waitForPageReady() = {
+    waitForLocation(newArg(wookie.getCurrentDocUri.getOrElse("")).matchIfPageReady())
+  }
+
+  def waitForLocation(arg: WaitArg) = {
+    lock.acquire()
+
+    wookie.waitForLocation(arg)
 
     lock.await()
   }
