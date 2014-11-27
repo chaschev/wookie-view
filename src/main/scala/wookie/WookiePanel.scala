@@ -4,6 +4,7 @@ import java.lang
 import java.text.SimpleDateFormat
 import java.util.Date
 import javafx.beans.value.{ChangeListener, ObservableValue}
+import javafx.concurrent.Worker
 import javafx.event.{ActionEvent, EventHandler}
 import javafx.scene.control.{Button, TextArea, TextField}
 import javafx.scene.input.{KeyCode, KeyEvent}
@@ -109,7 +110,16 @@ class WookiePanel(builder: WookiePanelBuilder) extends VBox with WookiePanelFiel
         }
       })
 
-      // setOnAlert, maybe??
+      engine.getLoadWorker.stateProperty.addListener(new ChangeListener[Worker.State] {
+        def changed(ov: ObservableValue[_ <: Worker.State], t: Worker.State, newState: Worker.State) {
+          if (newState eq Worker.State.SUCCEEDED) {
+            log(s"worker state -> SUCCEEDED, page ready: ${engine.getDocument.getDocumentURI}")
+          }
+        }
+      })
+
+
+            // setOnAlert, maybe??
       // see also setOnAlert in WookieView
       engine.setOnError(new EventHandler[WebErrorEvent] {
         def handle(webEvent: WebErrorEvent)

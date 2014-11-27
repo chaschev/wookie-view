@@ -1,7 +1,9 @@
 wookie-view
 ===========
 
-WookieView is made to simplify WebView usage and replace Selenium in some of the tasks, maybe. With WookieView you can easily automatize web browsing operations like searching with Google Search, visiting your Facebook page with your login and password, crawling through a forum and downloading files. WookieView is pure JDK, it uses a few Java libraries and can be seen as a lightweight version of Selenium.
+WookieView is made to simplify WebView usage and replace Selenium in some of the tasks, maybe. With WookieView you can easily automatize web browsing operations like searching with Google Search, visiting your Facebook page with your login and password, crawling through a forum and downloading files. 
+
+WookieView is pure JDK, it uses a few Java libraries and could remind of lightweight Selenium.
 
 ## Features
 
@@ -53,7 +55,7 @@ $("#password").value(password)
 WookieView wookieView = WookieView.newBuilder
     .useFirebug(false)
     .useJQuery(true)
-    .createWebView(!DownloadJDK.miniMode)  // WookieView can be hidden
+    .createWebView(true)  // WookieView can be invisible
     .includeJsScript(io.Source.fromInputStream(getClass.getResourceAsStream("/wookie/downloadJDK.js")).mkString)
     .build()
 ```

@@ -12,6 +12,8 @@ import wookie._
  */
 object GrabLyrics {
   val defaultPanel = SearchAndStarWookieSimple.defaultPanel
+  def newPanel: WookiePanel = defaultPanel.apply()
+
 
   val FROM_LANGUAGE = "Spanish"
   val TO_LANGUAGE = "English"
@@ -19,8 +21,6 @@ object GrabLyrics {
   val HOST = "http://lyricstranslate.com"
 
   val LYRICS_JSON = new File("lyrics.json")
-
-  def newPanel: WookiePanel = defaultPanel.apply()
 
   def main(args: Array[String])
   {

@@ -3,7 +3,8 @@ package wookie.example
 import java.text.SimpleDateFormat
 import java.util.TimeZone
 
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s._
+import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
 
@@ -20,7 +21,8 @@ object JsonObjectUtils {
         formatter.setTimeZone(TimeZone.getTimeZone("UTC"))
         formatter
       }
-    }
+    } + new EnumNameSerializer(SimpleCrawlerState)
+
 
   def toJson(obj: AnyRef, pretty:Boolean = false): String =
   {
