@@ -1,0 +1,33 @@
+!!! 5
+html
+  head
+    title Book Index
+    link(rel='stylesheet', href='books.css')
+  body
+    table#booksTable.CSSTableGenerator
+      thead
+        tr
+          th Book
+          th GoodReads
+          th Barnes & Noble
+          th Amazon
+          th Summary
+
+      each book, i in books
+        tr(class=(i % 2 == 0) ? 'odd' : 'even')
+          td= book.title()
+          td
+            if book.goodReadsBook().isDefined()
+              a(href=book.goodReadsBook().get().link()) #{book.goodReadsBook().get().rating()}
+              | &nbsp; (#{book.goodReadsBook().get().raters()})
+          td
+            if book.barnesBook().isDefined()
+              a(href=book.barnesBook().get().link()) #{book.barnesBook().get().rating()}
+              | &nbsp; (#{book.barnesBook().get().raters()})
+
+          td
+            if book.amazonBook().isDefined()
+              a(href=book.amazonBook().get().link()) #{book.amazonBook().get().rating()}
+              | &nbsp; (#{book.amazonBook().get().raters()})
+
+          td #{book.weighedRating()} (#{book.totalVotes()})

@@ -228,7 +228,7 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
 
   def run()
 
-  def asNotSimpleScenario = WookieSimpleScenario.asScenario(this)
+  def asNotSimpleScenario = WookieSimpleScenario.asNotSimpleScenario(this)
 
 //  /**
 //   * A helper method to return Java's $ from a DOM element.
@@ -248,7 +248,7 @@ abstract class WookieSimpleScenario(val title: String, val panel: PanelSupplier)
 }
 
 object WookieSimpleScenario {
-  def asScenario(s: WookieSimpleScenario): WookieScenario = {
+  def asNotSimpleScenario(s: WookieSimpleScenario): WookieScenario = {
     new WookieScenario(s.title, None, s.panel, (p, wv, js) => {
       s.wookie = wv
       s.run()

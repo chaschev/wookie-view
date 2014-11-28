@@ -1,16 +1,24 @@
 package wookie.example
 
-import java.io.File
+import java.io.{File, FileOutputStream}
 import java.net.URLEncoder
+import java.util.{ArrayList => JList}
 
 import chaschev.lang.LangUtils.toConciseString
-import org.apache.commons.io.FilenameUtils
+import de.neuland.jade4j.Jade4J
+import org.apache.commons.io.FilenameUtils.getBaseName
+import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.commons.lang3.StringUtils.{substringBefore, substringBetween}
 import wookie.example.SimpleCrawlerState._
 import wookie.{WookiePanel, WookieSandboxApp, WookieSimpleScenario}
 
+import scala.collection.JavaConversions._
 
 /**
+ * This application will fetch ratings for the books stored in a folder from Amazon, Good Reads, B&N.
+ *
+ * It will render results into books.html in the same folder by using Jade.
+ *
  * @author Andrey Chaschev chaschev@gmail.com
  */
 
@@ -33,12 +41,43 @@ case class BooksEntry(
   _state: SimpleCrawlerState = NOT_STARTED,
   _comment: String = ""
 ) extends SimpleCrawlerEntry(_state, _comment) {
+  def weighedRating: Double = {
+    val d =
+      amazonBook.map{_.rating}.getOrElse(0d) * 0.8 +
+      goodReadsBook.map{_.rating}.getOrElse(0d) * 1.1 +
+      barnesBook.map{_.rating}.getOrElse(0d) * 1.1
 
+    toConciseString(if (bookCount == 0) 0 else d / bookCount, 2).toDouble
+  }
+
+  def bookCount: Int = {
+    amazonBook.map(_ => 1).getOrElse(0) +
+      goodReadsBook.map(_ => 1).getOrElse(0) +
+      barnesBook.map(_ => 1).getOrElse(0)
+  }
+
+  def totalVotes: Int = {
+    amazonBook.map{_.raters}.getOrElse(0) +
+      goodReadsBook.map{_.raters}.getOrElse(0) +
+      barnesBook.map{_.raters}.getOrElse(0)
+  }
+
+  def title: String = {
+    amazonBook.map(_.title).getOrElse(
+      goodReadsBook.map(_.title).getOrElse(
+        barnesBook.map(_.title).getOrElse("<no-title>")
+      )
+    )
+  }
+
+  def goodReadsRef = goodReadsBook.map(_.link).getOrElse()
 }
 
 class CrawlException(msg: String) extends RuntimeException(msg)
 
 object BooksInfoCrawler {
+  val FOLDER = "/Users/andrey/Google Drive/books/gelato"
+
   val defaultPanel = SearchAndStarWookieSimple.defaultPanel
   def newPanel: WookiePanel = defaultPanel.apply()
 
@@ -47,8 +86,8 @@ object BooksInfoCrawler {
   def main(args: Array[String])
   {
     val crawler = new SimpleCrawler[BooksEntry](new SimpleCrawlerOptions[BooksEntry](
-      folder = "/Users/andrey/Google Drive/books/gelato",
-      projectName = "gelato"
+      folder = FOLDER,
+      projectName = getBaseName(FOLDER)
     ))
 
     val app = WookieSandboxApp.start()
@@ -56,10 +95,13 @@ object BooksInfoCrawler {
     app.runOnStage(
       new WookieSimpleScenario("Get Books Ratings", defaultPanel) {
         override def run(): Unit = {
+          crawler.start()
+
           val bookFiles = new File(crawler.options.folder).listFiles().toList.filterNot( f=>
             f.isHidden ||
             f.getName.endsWith("jpg") ||
-            f.getName.endsWith("opf")
+            f.getName.endsWith("opf") ||
+            f.getName.startsWith("books")
           )
 
           for(bookFile <- bookFiles) {
@@ -68,7 +110,7 @@ object BooksInfoCrawler {
             }
 
             def getRatings: BooksEntry = {
-              val encodedRequest = URLEncoder.encode(FilenameUtils.getBaseName(bookFile.getName), "UTF-8")
+              val encodedRequest = URLEncoder.encode(getBaseName(bookFile.getName), "UTF-8")
 
               load(s"http://www.amazon.com/s/ref=nb_sb_noss_2?url=search-alias%3Daps&field-keywords=${encodedRequest}")
 
@@ -111,7 +153,7 @@ object BooksInfoCrawler {
                       val ratingString = goodreadsResultDiv.find(".minirating")(0).trimmedText()
 
                       val rating = substringBefore(ratingString, " ").toDouble
-                      val raters = substringBetween(ratingString, "— ", " ratings").replaceAll(",", "").toInt
+                      val raters = substringBetween(ratingString, "— ", " rating").replaceAll(",", "").toInt
 
                       new BookLink(
                         title = goodreadsResultDiv.find("a.bookTitle")(0).trimmedText(),
@@ -197,7 +239,25 @@ object BooksInfoCrawler {
               crawler.saveState()
             }
           }
+
+          crawler.complete()
+
+          val sortedEntries = crawler.state.entries.toList.sortWith((e1, e2) => e1.weighedRating - e2.weighedRating > 0)
+          val sortedEntriesJava = new JList[BooksEntry]()
+
+          sortedEntries.foreach(sortedEntriesJava.add)
+
+          val indexFileHtml = new File(crawler.options.folder, "books.html")
+
+          IOUtils.copy(getClass.getResourceAsStream("books.css"), new FileOutputStream(new File(crawler.options.folder, "books.css")))
+
+          FileUtils.writeStringToFile(indexFileHtml,
+            Jade4J.render(getClass.getResource("books.jade"), Map("books" -> sortedEntriesJava)))
+
+          load(indexFileHtml.toURI.toURL.toString)
         }
+
+
     }.asNotSimpleScenario)
 
   }
